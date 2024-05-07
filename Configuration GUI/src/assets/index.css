@@ -18,143 +18,141 @@
  */
 
 :root {
-    --color-primary: #e74c3c;
-    --color-primary-light: #ff9e93;
-    --color-okay: #27ae60;
-    --color-okay-hover: #20864b;
-    --color-secondary: #2c3e50;
-    --color-secondary-light: #415e7a;
-    --color-yellow: #f1c40f;
+  --color-primary: #e74c3c;
+  --color-primary-light: #ff9e93;
+  --color-okay: #27ae60;
+  --color-okay-hover: #20864b;
+  --color-secondary: #2c3e50;
+  --color-secondary-light: #415e7a;
+  --color-yellow: #f1c40f;
 }
 
 body {
-    width: 100%;
-    overflow-x: hidden;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-
 .sidebar {
-    width: auto;
-    display: block;
-    background: #ecf0f1;
-    border-right: 1px solid rgba(208, 208, 208, 0.8);
+  width: auto;
+  display: block;
+  background: #ecf0f1;
+  border-right: 1px solid rgba(208, 208, 208, 0.8);
 }
 
 .sidebar-nav .nav-title {
-    color: #7f8c8d;
+  color: #7f8c8d;
 }
 
 .sidebar-nav .nav-link {
-    color: #000;
-    text-align: center;
-    display: block;
+  color: #000;
+  text-align: center;
+  display: block;
 }
 
-
 .sidebar-nav .nav-link i {
-    font-size: 25px;
-    text-align: center;
-    display: inline-block;
+  font-size: 25px;
+  text-align: center;
+  display: inline-block;
 }
 
 .sidebar-nav .nav-link.active,
 .sidebar-nav .nav-link:hover {
-    color: #fff;
-    background: var(--color-primary);
+  color: #fff;
+  background: var(--color-primary);
 }
 
 .sidebar-nav .logout:hover {
-    background: none !important;
-    color: var(--color-primary);
+  background: none !important;
+  color: var(--color-primary);
 }
 
 .sidebar-brand {
-    background: var(--color-secondary);
-    font-size: 20px;
-    padding: 10px;
+  background: var(--color-secondary);
+  font-size: 20px;
+  padding: 10px;
 }
 
 table tr th {
-    background: var(--color-secondary) !important;
-    color: #FFF !important;
+  background: var(--color-secondary) !important;
+  color: #fff !important;
 }
 
 .btn-primary,
 .btn-primary:disabled {
-    background-color: var(--color-okay);
-    border-color: var(--color-okay);
+  background-color: var(--color-okay);
+  border-color: var(--color-okay);
 }
 
 .btn-primary:hover {
-    background-color: var(--color-okay-hover);
-    border-color: var(--color-okay-hover);
+  background-color: var(--color-okay-hover);
+  border-color: var(--color-okay-hover);
 }
 
 .btn-danger {
-    background-color: var(--color-primary);
+  background-color: var(--color-primary);
 }
 
 .nav-item button {
-    color: #000;
+  color: #000;
 }
 
 .nav-item button:hover,
 .nav-item button.active {
-    color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
 }
 
-
 .form-check-input:checked {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .nav-item span {
-    color: var(--color-secondary);
-    text-align: center;
-    flex-grow: 1;
-    display: block;
-    opacity: 0.5;
+  color: var(--color-secondary);
+  text-align: center;
+  flex-grow: 1;
+  display: block;
+  opacity: 0.5;
 }
 
 .btn {
-    padding: 10px 10px 10px 10px !important;
+  padding: 10px 10px 10px 10px !important;
 }
 
 .accordion-button:not(.collapsed) {
-    background-color: var(--color-secondary);
-    color: #FFF;
+  background-color: var(--color-secondary);
+  color: #fff;
 }
 
 .accordion-button {
-    background-color: var(--color-secondary);
-    color: #FFF;
+  background-color: var(--color-secondary);
+  color: #fff;
 }
 
 .accordion-button::after {
-    -webkit-filter: grayscale(1) invert(1);
-    filter: grayscale(1) invert(1);
+  -webkit-filter: grayscale(1) invert(1);
+  filter: grayscale(1) invert(1);
 }
 
 @media only screen and (max-width: 450px) {
-    .sidebar-nav .nav-link i {
-        font-size: 20px;
-    }
+  .sidebar-nav .nav-link i {
+    font-size: 20px;
+  }
 
-    .sidebar-brand i {
-        display: none;
-    }
+  .sidebar-brand i {
+    display: none;
+  }
 
-    .sidebar-brand {
-        font-size: 15px;
-    }
+  .sidebar-brand {
+    font-size: 15px;
+  }
 }
 
 .sidebar:not(.sidebar-end):not(.show) {
-    margin-left: inherit !important;
+  margin-left: inherit !important;
 }
 
 .fixed-navbar {
-    position: fixed;
-    height: 100%;
+  position: fixed;
+  height: 100%;
+  z-index: 1000; /* Added so that Language Selector is on top */
 }
