@@ -112,6 +112,7 @@ const Navbar = () => {
           text={""}
           icon={"bi bi-gear-wide-connected"}
         />
+        <NavLink to={"/tests"} text={""} icon={"bi bi-bar-chart-steps"} />
         <Row className="flex-grow-1"></Row>
         <Selector />
         <Row>

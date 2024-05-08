@@ -32,6 +32,7 @@ import Ports from "./sites/Ports";
 import Settings from "./sites/Settings";
 import Offline from "./sites/Offline";
 import Tables from "./sites/Tables";
+import TestSettings from "./components/TestSettings";
 import config from "./config";
 import { StreamSettings } from "./common/Interfaces";
 import { Stream } from "./common/Interfaces";
@@ -131,6 +132,7 @@ const App = () => {
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
                       <Route path={"/settings"} element={<Settings />} />
+                      <Route path={"/tests"} element={<TestSettings />} />
                     </Routes>
                   ) : (
                     <Offline />
