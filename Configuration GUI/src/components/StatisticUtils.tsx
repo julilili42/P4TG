@@ -1,4 +1,9 @@
-import { Statistics } from "../common/Interfaces";
+import {
+  Statistics,
+  StreamSettings,
+  Stream,
+  TimeStatistics,
+} from "../common/Interfaces";
 export const get_frame_types = (
   stats: Statistics,
   port_mapping: { [name: number]: number },
@@ -135,6 +140,26 @@ export const formatNanoSeconds = (
 
   return parseFloat((ns / Math.pow(k, i)).toFixed(dm)) + " " + si;
 };
+export const getStreamIDsByPort = (
+  pid: number,
+  stream_settings: StreamSettings[],
+  streams: Stream[]
+): number[] => {
+  let ret: number[] = [];
+
+  stream_settings.forEach((v) => {
+    if (v.port == pid && v.active) {
+      streams.forEach((s) => {
+        if (s.stream_id == v.stream_id) {
+          ret.push(s.app_id);
+          return;
+        }
+      });
+    }
+  });
+
+  return ret;
+};
 export const calculateWeightedRTTs = (
   stats: Statistics,
   port_mapping: { [name: number]: number }
@@ -234,4 +259,74 @@ export const addRates = (
   });
 
   return ret;
+};
+export const activePorts = (port_mapping: {
+  [name: number]: number;
+}): { tx: number; rx: number }[] => {
+  let active_ports: { tx: number; rx: number }[] = [];
+  let exists: number[] = [];
+
+  Object.keys(port_mapping).forEach((tx_port: string) => {
+    let port = parseInt(tx_port);
+    exists.push(port);
+    active_ports.push({ tx: port, rx: port_mapping[port] });
+  });
+
+  return active_ports;
+};
+export const secondsToTime = (s: number) => {
+  let hours = Math.floor(s / 3600);
+  let minutes = Math.floor((s % 3600) / 60);
+  let seconds = Math.floor((s % 3600) % 60);
+
+  return hours + "h " + minutes + "m " + seconds + "s";
+};
+export const get_rtt = (
+  data: TimeStatistics,
+  port_mapping: { [name: number]: number }
+): [string[], number[]] => {
+  let cum_data: { [name: number]: number }[] = [];
+
+  if ("rtt" in data) {
+    Object.values(port_mapping).map((v) => {
+      // @ts-ignore
+      if (v in data["rtt"]) {
+        // @ts-ignore
+        cum_data.push(data["rtt"][v]);
+      }
+    });
+  }
+
+  let ret_data = cum_data.reduce(
+    (acc, current) => {
+      const key = Object.keys(current);
+
+      key.forEach((k) => {
+        if (Object.keys(acc[0]).includes(k)) {
+          // @ts-ignore
+          acc[0][k] += current[k];
+          // @ts-ignore
+          acc[1][k] += 1;
+        } else {
+          // @ts-ignore
+          acc[0][k] = current[k];
+          // @ts-ignore
+          acc[1][k] = 1;
+        }
+      });
+
+      return acc;
+    },
+    [{}, {}]
+  );
+
+  Object.keys(ret_data[0]).forEach((v) => {
+    // @ts-ignore
+    ret_data[0][v] = ret_data[0][v] / ret_data[1][v];
+  });
+
+  return [
+    Object.keys(ret_data[0]).map((v) => secondsToTime(parseInt(v))),
+    Object.values(ret_data[0]),
+  ];
 };

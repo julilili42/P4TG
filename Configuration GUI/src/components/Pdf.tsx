@@ -2,7 +2,13 @@ import React, { useEffect, useState } from "react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "react-bootstrap";
-import { Statistics, Stream, GenerationMode } from "../common/Interfaces";
+import {
+  Statistics,
+  Stream,
+  GenerationMode,
+  StreamSettings,
+  TimeStatistics,
+} from "../common/Interfaces";
 import { get } from "../common/API";
 import {
   get_frame_types,
@@ -13,9 +19,29 @@ import {
   calculateWeightedRTTs,
   calculateWeightedIATs,
   formatNanoSeconds,
+  getStreamIDsByPort,
+  activePorts,
+  get_rtt,
 } from "./StatisticUtils";
 import { secondsToTime } from "./SendReceiveMonitor";
 import translate from "./Translate";
+
+import { UserOptions } from "jspdf-autotable";
+
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Filler,
+  Legend,
+  ArcElement,
+} from "chart.js";
+
+import { Doughnut, Line } from "react-chartjs-2";
 
 const formatTime = (): string => {
   const LeadingZero = (num: number) => {
@@ -42,9 +68,11 @@ const formatTime = (): string => {
 
 const DownloadPdfButton = React.memo(
   ({
+    data,
     stats,
     port_mapping,
   }: {
+    data: TimeStatistics;
     stats: Statistics;
     port_mapping: { [name: number]: number };
   }) => {
@@ -78,6 +106,10 @@ const DownloadPdfButton = React.memo(
     const [mode, set_mode] = useState(
       parseInt(localStorage.getItem("gen-mode") || String(GenerationMode.NONE))
     );
+    // @ts-ignore
+    // prettier-ignore
+    const [stream_settings, set_stream_settings] = useState<StreamSettings[]>(JSON.parse(localStorage.getItem("streamSettings")) || []);
+
     const loadPorts = async () => {
       let stats = await get({ route: "/ports" });
 
@@ -141,64 +173,31 @@ const DownloadPdfButton = React.memo(
       return indicesToDraw.includes(columnIndex);
     };
 
-    const activePorts = (): { tx: number; rx: number }[] => {
-      let active_ports: { tx: number; rx: number }[] = [];
-      let exists: number[] = [];
-
-      Object.keys(port_mapping).forEach((tx_port: string) => {
-        let port = parseInt(tx_port);
-        exists.push(port);
-        active_ports.push({ tx: port, rx: port_mapping[port] });
-      });
-
-      return active_ports;
+    const getPortAndChannelFromPid = (pid: number | string) => {
+      const numericPid = typeof pid === "string" ? parseInt(pid) : pid;
+      const pidData = ports.find((p) => p.pid === numericPid);
+      return pidData
+        ? { port: pidData.port, channel: pidData.channel }
+        : { port: "N/A", channel: "N/A" };
     };
 
-    const handleDownloadPdf = () => {
-      const doc = new jsPDF("p", "mm", [297, 210]);
-
-      const columnsT0 = [
-        "Port TX",
-        "Channel TX",
-        "PID TX",
-        "Port RX",
-        "Channel RX",
-        "PID RX",
-      ];
-
-      const rowsT0 = [];
-      for (const [txPid, rxPid] of Object.entries(port_mapping)) {
-        const tx = ports.find((port) => port.pid === parseInt(txPid));
-        const txPort = tx?.port ?? "N/A";
-        const txChannel = tx?.channel ?? "N/A";
-
-        const rx = ports.find((port) => port.pid === rxPid);
-        const rxPort = rx?.port ?? "N/A";
-        const rxChannel = rx?.channel ?? "N/A";
-
-        rowsT0.push([txPort, txChannel, txPid, rxPort, rxChannel, rxPid]);
-      }
-
-      /*
-        Port Mapping Table 
-      */
-      autoTable(doc, {
-        head: [columnsT0],
-        body: rowsT0,
+    const createAutoTableConfig = (
+      doc: jsPDF,
+      columns: string[],
+      rows: (string | number | boolean)[][],
+      columnStyles: { [key: number]: { cellWidth: number } },
+      indicesToDraw: number[],
+      options?: any // Indices, an denen Linien gezeichnet werden sollen
+    ): UserOptions => {
+      // Modifiziere das UserOptions Objekt, um die didDrawCell Logik zu integrieren
+      const modifiedOptions: UserOptions = {
+        ...options,
+        head: [columns],
+        body: rows,
         theme: "plain",
-        styles: {
-          halign: "center",
-        },
-        startY: 25,
-        columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 30 },
-        },
-        didDrawCell: (data) => {
-          if (shouldDrawLine(data.column.index, [0, 1, 2, 3, 4, 5])) {
+        columnStyles: columnStyles,
+        didDrawCell: (data: any) => {
+          if (shouldDrawLine(data.column.index, indicesToDraw)) {
             doc.setDrawColor(0);
             doc.setLineWidth(0.1);
             doc.line(
@@ -209,7 +208,63 @@ const DownloadPdfButton = React.memo(
             );
           }
         },
-      });
+      };
+
+      return modifiedOptions;
+    };
+
+    const handleDownloadPdf = () => {
+      const doc = new jsPDF("p", "mm", [297, 210]);
+      const columnsT0 = [
+        "Port TX",
+        "Channel TX",
+        "PID TX",
+        "Port RX",
+        "Channel RX",
+        "PID RX",
+      ];
+
+      const rowsT0 = [];
+
+      for (const [txPid, rxPid] of Object.entries(port_mapping)) {
+        const txData = getPortAndChannelFromPid(txPid);
+        const rxData = getPortAndChannelFromPid(rxPid);
+
+        rowsT0.push([
+          txData.port,
+          txData.channel,
+          txPid,
+          rxData.port,
+          rxData.channel,
+          rxPid,
+        ]);
+      }
+
+      /*
+        Port Mapping Table 
+      */
+      autoTable(
+        doc,
+        createAutoTableConfig(
+          doc,
+          columnsT0,
+          rowsT0,
+          {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 30 },
+            3: { cellWidth: 30 },
+            4: { cellWidth: 30 },
+          },
+          [0, 1, 2, 3, 4, 5],
+          {
+            styles: {
+              halign: "center",
+            },
+            startY: 25,
+          }
+        )
+      );
 
       const columnsT1 = ["Type", "", "", "Type", ""];
 
@@ -406,31 +461,24 @@ const DownloadPdfButton = React.memo(
       /*
       Frame and Ethernet Type Table
       */
-      autoTable(doc, {
-        head: [columnsT2],
-        body: rowsT2,
-        theme: "plain",
-        columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 10 },
-          4: { cellWidth: 30 },
-          5: { cellWidth: 25 },
-        },
-        didDrawCell: (data) => {
-          if (shouldDrawLine(data.column.index, [0, 1, 2, 4, 5, 6])) {
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.1);
-            doc.line(
-              data.cell.x,
-              data.cell.y + data.cell.height,
-              data.cell.x + data.cell.width,
-              data.cell.y + data.cell.height
-            );
-          }
-        },
-      });
+
+      autoTable(
+        doc,
+        createAutoTableConfig(
+          doc,
+          columnsT2,
+          rowsT2,
+          {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 30 },
+            3: { cellWidth: 10 },
+            4: { cellWidth: 30 },
+            5: { cellWidth: 25 },
+          },
+          [0, 1, 2, 4, 5, 6]
+        )
+      );
 
       const columnsT3 = [
         "Frame Size",
@@ -509,31 +557,24 @@ const DownloadPdfButton = React.memo(
       /*
       Frame Size Count Table 
       */
-      autoTable(doc, {
-        head: [columnsT3],
-        body: rowsT3,
-        theme: "plain",
-        columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 10 },
-          4: { cellWidth: 30 },
-          5: { cellWidth: 25 },
-        },
-        didDrawCell: (data) => {
-          if (shouldDrawLine(data.column.index, [0, 1, 2, 4, 5, 6])) {
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.1);
-            doc.line(
-              data.cell.x,
-              data.cell.y + data.cell.height,
-              data.cell.x + data.cell.width,
-              data.cell.y + data.cell.height
-            );
-          }
-        },
-      });
+
+      autoTable(
+        doc,
+        createAutoTableConfig(
+          doc,
+          columnsT3,
+          rowsT3,
+          {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 30 },
+            3: { cellWidth: 10 },
+            4: { cellWidth: 30 },
+            5: { cellWidth: 25 },
+          },
+          [0, 1, 2, 4, 5, 6]
+        )
+      );
 
       let pageBreak = false;
 
@@ -543,7 +584,7 @@ const DownloadPdfButton = React.memo(
 
       doc.addPage();
 
-      activePorts().map((v, i, array) => {
+      activePorts(port_mapping).map((v, i, array) => {
         let mapping: { [name: number]: number } = { [v.tx]: v.rx };
 
         let ret_tx = 0;
@@ -623,34 +664,28 @@ const DownloadPdfButton = React.memo(
           )
         );
 
-        autoTable(doc, {
-          head: [columnsT2],
-          body: rowsT5,
-          theme: "plain",
-          styles: {
-            halign: "center",
-          },
-          columnStyles: {
-            0: { cellWidth: 30 },
-            1: { cellWidth: 30 },
-            2: { cellWidth: 30 },
-            3: { cellWidth: 10 },
-            4: { cellWidth: 30 },
-            5: { cellWidth: 25 },
-          },
-          didDrawCell: (data) => {
-            if (shouldDrawLine(data.column.index, [0, 1, 2, 4, 5, 6])) {
-              doc.setDrawColor(0);
-              doc.setLineWidth(0.1);
-              doc.line(
-                data.cell.x,
-                data.cell.y + data.cell.height,
-                data.cell.x + data.cell.width,
-                data.cell.y + data.cell.height
-              );
+        autoTable(
+          doc,
+          createAutoTableConfig(
+            doc,
+            columnsT2,
+            rowsT5,
+            {
+              0: { cellWidth: 30 },
+              1: { cellWidth: 30 },
+              2: { cellWidth: 30 },
+              3: { cellWidth: 10 },
+              4: { cellWidth: 30 },
+              5: { cellWidth: 25 },
+            },
+            [0, 1, 2, 4, 5, 6],
+            {
+              styles: {
+                halign: "center",
+              },
             }
-          },
-        });
+          )
+        );
 
         const rowsT6 = [
           ...frameSizes.map(([label, low, high]) =>
@@ -675,34 +710,28 @@ const DownloadPdfButton = React.memo(
           ),
         ];
 
-        autoTable(doc, {
-          head: [columnsT3],
-          body: rowsT6,
-          theme: "plain",
-          styles: {
-            halign: "center",
-          },
-          columnStyles: {
-            0: { cellWidth: 30 },
-            1: { cellWidth: 30 },
-            2: { cellWidth: 30 },
-            3: { cellWidth: 10 },
-            4: { cellWidth: 30 },
-            5: { cellWidth: 25 },
-          },
-          didDrawCell: (data) => {
-            if (shouldDrawLine(data.column.index, [0, 1, 2, 4, 5, 6])) {
-              doc.setDrawColor(0);
-              doc.setLineWidth(0.1);
-              doc.line(
-                data.cell.x,
-                data.cell.y + data.cell.height,
-                data.cell.x + data.cell.width,
-                data.cell.y + data.cell.height
-              );
+        autoTable(
+          doc,
+          createAutoTableConfig(
+            doc,
+            columnsT3,
+            rowsT6,
+            {
+              0: { cellWidth: 30 },
+              1: { cellWidth: 30 },
+              2: { cellWidth: 30 },
+              3: { cellWidth: 10 },
+              4: { cellWidth: 30 },
+              5: { cellWidth: 25 },
+            },
+            [0, 1, 2, 4, 5, 6],
+            {
+              styles: {
+                halign: "center",
+              },
             }
-          },
-        });
+          )
+        );
 
         if (i < array.length - 1) {
           doc.addPage();
@@ -746,35 +775,68 @@ const DownloadPdfButton = React.memo(
         stream.number_of_lse,
       ]);
 
-      autoTable(doc, {
-        head: [columnsT7],
-        body: rowsT7,
-        theme: "plain",
-        styles: {
-          halign: "center",
-        },
-        startY: 25,
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 35 },
-        },
-        didDrawCell: (data) => {
-          if (shouldDrawLine(data.column.index, [0, 1, 2, 3, 4, 5, 6])) {
-            doc.setDrawColor(0);
-            doc.setLineWidth(0.1);
-            doc.line(
-              data.cell.x,
-              data.cell.y + data.cell.height,
-              data.cell.x + data.cell.width,
-              data.cell.y + data.cell.height
-            );
+      autoTable(
+        doc,
+        createAutoTableConfig(
+          doc,
+          columnsT7,
+          rowsT7,
+          {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 25 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 30 },
+            4: { cellWidth: 25 },
+            5: { cellWidth: 35 },
+          },
+          [0, 1, 2, 3, 4, 5, 6],
+          {
+            styles: {
+              halign: "center",
+            },
+            startY: 25,
           }
-        },
+        )
+      );
+
+      const columnsT8 = ["TX Port", "RX Port"].concat(
+        streams.map((stream) => `Stream ${stream.app_id}`)
+      );
+
+      const rowsT8 = activePorts(port_mapping).map((stream) => {
+        const createArrayWithIndex = (
+          indices: number[],
+          arraySize: number
+        ): string[] =>
+          Array.from({ length: arraySize }, (_, i) =>
+            indices.includes(i + 1) ? "on" : "off"
+          );
+        return [
+          `${getPortAndChannelFromPid(stream.tx).port} (${stream.tx})`,
+          `${getPortAndChannelFromPid(stream.rx).port} (${stream.rx})`,
+        ].concat(
+          createArrayWithIndex(
+            getStreamIDsByPort(stream.tx, stream_settings, streams),
+            columnsT8.length - 2
+          )
+        );
       });
+
+      autoTable(
+        doc,
+        createAutoTableConfig(
+          doc,
+          columnsT8,
+          rowsT8,
+          { 0: { cellWidth: 25 }, 1: { cellWidth: 25 } },
+          [0, 1, 2, 3, 4, 5, 6, 7, 8],
+          {
+            styles: {
+              halign: "center",
+            },
+          }
+        )
+      );
 
       /* Add header and footer on every page */
       var totalPages = doc.getNumberOfPages();
@@ -813,7 +875,7 @@ const DownloadPdfButton = React.memo(
         doc.text("P4TG Network Report", pageWidth / 2, 10, { align: "center" });
       }
 
-      const subHeaders = activePorts().map((v) => [
+      const subHeaders = activePorts(port_mapping).map((v) => [
         `Overview ${v.tx} --> ${v.rx}`,
       ]);
 

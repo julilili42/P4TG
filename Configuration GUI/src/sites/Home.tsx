@@ -342,6 +342,7 @@ const Home = () => {
                 {shouldShowDownloadButton() ? (
                   <>
                     <DownloadPdfButton
+                      data={time_statistics}
                       stats={statistics}
                       port_mapping={port_tx_rx_mapping}
                     />
