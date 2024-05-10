@@ -23,7 +23,7 @@ import { del, get, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
 import StatView from "../components/StatView";
 import Loader from "../components/Loader";
-import DownloadPdfButton from "../components/Pdf";
+import DownloadPdfButton from "../components/pdf/Pdf";
 
 import {
   Encapsulation,
@@ -38,6 +38,7 @@ import {
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
 import translate from "../components/Translate";
+import HiddenGraphs from "../components/pdf/HiddenGraphs";
 
 styled(Row)`
   display: flex;
@@ -94,6 +95,8 @@ const Home = () => {
     useState<StatInterface>(StatisticsObject);
   const [time_statistics, set_time_statistics] =
     useState<TimeStatistics>(TimeStatisticsObject);
+
+  const [graphImages, setGraphImages] = useState<string[]>();
 
   useEffect(() => {
     if (!runOnce && running) {
@@ -302,6 +305,11 @@ const Home = () => {
     localStorage.setItem("pdfButton", "false");
   };
 
+  const handleGraphConvert = (imageData: string[]) => {
+    setGraphImages(imageData);
+    localStorage.setItem("imageData", JSON.stringify(imageData));
+  };
+
   return (
     <Loader loaded={loaded} overlay={overlay}>
       <form onSubmit={onSubmit}>
@@ -341,10 +349,23 @@ const Home = () => {
                 </Button>{" "}
                 {shouldShowDownloadButton() ? (
                   <>
+                    <HiddenGraphs
+                      data={time_statistics}
+                      stats={statistics}
+                      port_mapping={port_tx_rx_mapping}
+                      onConvert={handleGraphConvert}
+                    />
                     <DownloadPdfButton
                       data={time_statistics}
                       stats={statistics}
                       port_mapping={port_tx_rx_mapping}
+                      graph_images={
+                        graphImages
+                          ? graphImages
+                          : JSON.parse(
+                              localStorage.getItem("imageData") ?? ""
+                            ) ?? []
+                      }
                     />
                   </>
                 ) : (

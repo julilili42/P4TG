@@ -156,3 +156,12 @@ table tr th {
   height: 100%;
   z-index: 1000; /* Added so that Language Selector is on top */
 }
+
+.hidden-div {
+  position: absolute;
+  height: 1100px;
+  top: -2000px;
+  left: 0px;
+  width: 1000px;
+  overflow: hidden;
+}

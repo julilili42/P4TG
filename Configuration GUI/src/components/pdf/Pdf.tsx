@@ -8,8 +8,8 @@ import {
   GenerationMode,
   StreamSettings,
   TimeStatistics,
-} from "../common/Interfaces";
-import { get } from "../common/API";
+} from "../../common/Interfaces";
+import { get } from "../../common/API";
 import {
   get_frame_types,
   get_lost_packets,
@@ -22,9 +22,9 @@ import {
   getStreamIDsByPort,
   activePorts,
   get_rtt,
-} from "./StatisticUtils";
-import { secondsToTime } from "./SendReceiveMonitor";
-import translate from "./Translate";
+} from "../StatisticUtils";
+import { secondsToTime } from "../SendReceiveMonitor";
+import translate from "../Translate";
 
 import { UserOptions } from "jspdf-autotable";
 
@@ -71,10 +71,12 @@ const DownloadPdfButton = React.memo(
     data,
     stats,
     port_mapping,
+    graph_images,
   }: {
     data: TimeStatistics;
     stats: Statistics;
     port_mapping: { [name: number]: number };
+    graph_images: string[];
   }) => {
     const [rtt, set_rtt] = useState({
       mean: 0,
@@ -837,6 +839,11 @@ const DownloadPdfButton = React.memo(
           }
         )
       );
+      doc.addPage();
+
+      graph_images.forEach((imageData, index) => {
+        doc.addImage(imageData, "JPEG", 15, 25 + 40 * index, 180, 36);
+      });
 
       /* Add header and footer on every page */
       var totalPages = doc.getNumberOfPages();
