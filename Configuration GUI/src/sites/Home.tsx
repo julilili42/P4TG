@@ -76,7 +76,7 @@ const Home = () => {
   const [running, set_running] = useState(false);
   const [visual, set_visual] = useState(true);
 
-  const [runOnce, setRunOnce] = useState(false);
+  const [pdfReady, setPdfReady] = useState(false);
 
   const [streams, set_streams] = useState<Stream[]>(
     JSON.parse(localStorage.getItem("streams") ?? "") ?? []
@@ -95,14 +95,6 @@ const Home = () => {
     useState<StatInterface>(StatisticsObject);
   const [time_statistics, set_time_statistics] =
     useState<TimeStatistics>(TimeStatisticsObject);
-
-  const [graphImages, setGraphImages] = useState<string[]>();
-
-  useEffect(() => {
-    if (!runOnce && running) {
-      setRunOnce(true);
-    }
-  }, [running, runOnce]);
 
   useEffect(() => {
     refresh();
@@ -297,17 +289,17 @@ const Home = () => {
     localStorage.setItem("pdfButton", "true");
   };
 
-  const shouldShowDownloadButton = () => {
-    return localStorage.getItem("pdfButton") == "true";
-  };
-
   const hideDownloadButton = () => {
     localStorage.setItem("pdfButton", "false");
   };
 
+  const shouldShowDownloadButton = () => {
+    return localStorage.getItem("pdfButton") == "true";
+  };
+
   const handleGraphConvert = (imageData: string[]) => {
-    setGraphImages(imageData);
     localStorage.setItem("imageData", JSON.stringify(imageData));
+    setPdfReady(true);
   };
 
   return (
@@ -340,6 +332,7 @@ const Home = () => {
                   onClick={() => {
                     reset();
                     hideDownloadButton();
+                    setPdfReady(false);
                   }}
                   className="mb-1"
                   variant="warning"
@@ -356,16 +349,13 @@ const Home = () => {
                       onConvert={handleGraphConvert}
                     />
                     <DownloadPdfButton
-                      data={time_statistics}
                       stats={statistics}
                       port_mapping={port_tx_rx_mapping}
                       graph_images={
-                        graphImages
-                          ? graphImages
-                          : JSON.parse(
-                              localStorage.getItem("imageData") ?? ""
-                            ) ?? []
+                        JSON.parse(localStorage.getItem("imageData") ?? "") ??
+                        []
                       }
+                      visible={pdfReady}
                     />
                   </>
                 ) : (

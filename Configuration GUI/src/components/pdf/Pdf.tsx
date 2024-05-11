@@ -7,7 +7,6 @@ import {
   Stream,
   GenerationMode,
   StreamSettings,
-  TimeStatistics,
 } from "../../common/Interfaces";
 import { get } from "../../common/API";
 import {
@@ -21,27 +20,11 @@ import {
   formatNanoSeconds,
   getStreamIDsByPort,
   activePorts,
-  get_rtt,
 } from "../StatisticUtils";
 import { secondsToTime } from "../SendReceiveMonitor";
 import translate from "../Translate";
 
 import { UserOptions } from "jspdf-autotable";
-
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Filler,
-  Legend,
-  ArcElement,
-} from "chart.js";
-
-import { Doughnut, Line } from "react-chartjs-2";
 
 const formatTime = (): string => {
   const LeadingZero = (num: number) => {
@@ -68,15 +51,15 @@ const formatTime = (): string => {
 
 const DownloadPdfButton = React.memo(
   ({
-    data,
     stats,
     port_mapping,
     graph_images,
+    visible,
   }: {
-    data: TimeStatistics;
     stats: Statistics;
     port_mapping: { [name: number]: number };
     graph_images: string[];
+    visible: boolean;
   }) => {
     const [rtt, set_rtt] = useState({
       mean: 0,
@@ -841,6 +824,7 @@ const DownloadPdfButton = React.memo(
       );
       doc.addPage();
 
+      /* Network Graphs */
       graph_images.forEach((imageData, index) => {
         doc.addImage(imageData, "JPEG", 15, 25 + 40 * index, 180, 36);
       });
@@ -888,6 +872,7 @@ const DownloadPdfButton = React.memo(
 
       subHeaders.unshift(["Summary"]);
       subHeaders.push([`Stream Configuration in ${modes[mode]} mode`]);
+      subHeaders.push([`Generated Network Graphs`]);
 
       let currentPage = 1;
 
@@ -899,9 +884,7 @@ const DownloadPdfButton = React.memo(
 
         currentPage++;
 
-        // If pageBreak is true and it's after the Summary page
         if (pageBreak && i == 0) {
-          // Add an empty page without a header
           currentPage++;
         }
       }
@@ -910,7 +893,12 @@ const DownloadPdfButton = React.memo(
     };
 
     return (
-      <Button onClick={handleDownloadPdf} className="mb-1" variant="secondary">
+      <Button
+        onClick={handleDownloadPdf}
+        className="mb-1"
+        variant="secondary"
+        disabled={!visible}
+      >
         <i className="bi bi-download" /> PDF Download
       </Button>
     );

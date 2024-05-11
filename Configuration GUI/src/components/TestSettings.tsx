@@ -1,11 +1,50 @@
 import { useEffect, useState } from "react";
-import { Tab, Tabs } from "react-bootstrap";
+import { Button, Tab, Tabs } from "react-bootstrap";
 import Settings from "../sites/Settings";
+import Form from "react-bootstrap/Form";
 
 const TestSettings = () => {
   const [key, setKey] = useState("home");
+  const [totalDuration, setTotalDuration] = useState(0);
+
+  const DurationInput = () => {
+    const [duration, setDuration] = useState(0);
+
+    const handleDurationChange = (e: any) => {
+      const num = parseInt(e.target.value);
+      if (!isNaN(num) && num >= 0) {
+        setDuration(num);
+      }
+    };
+
+    const handleSubmit = (e: any) => {
+      e.preventDefault();
+      setTotalDuration((prevTotal) => prevTotal + duration);
+    };
+
+    return (
+      <>
+        <Form onSubmit={handleSubmit} style={{ width: "15%" }}>
+          <Form.Group className="mb-3" controlId="numberInput">
+            <Form.Label>Enter test duration</Form.Label>
+            <Form.Control
+              type="text"
+              value={duration}
+              onChange={handleDurationChange}
+              placeholder="Number of seconds"
+            />
+          </Form.Group>
+        </Form>
+        <Settings />
+      </>
+    );
+  };
   const [tabs, setTabs] = useState([
-    { eventKey: "home", title: "Test 1", content: <Settings /> },
+    {
+      eventKey: "home",
+      title: "Test 1",
+      content: <DurationInput />,
+    },
     { eventKey: "add", title: "+", content: "" },
   ]);
 
@@ -14,7 +53,7 @@ const TestSettings = () => {
     const newTab = {
       eventKey: newTabKey,
       title: `Test ${tabs.length}`,
-      content: <Settings />,
+      content: <DurationInput />,
     };
     const newTabs = [...tabs];
     newTabs.splice(tabs.length - 1, 0, newTab);
@@ -52,48 +91,72 @@ const TestSettings = () => {
   }, [key, tabs]);
 
   return (
-    <Tabs
-      id="uncontrolled-tab-example"
-      className="mb-3"
-      activeKey={key}
-      onSelect={(k) => {
-        if (k === "add") {
-          addTab();
-        } else {
-          // @ts-ignore
-          setKey(k);
-        }
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-around",
+        flexDirection: "column",
       }}
     >
-      {tabs.map((tab, index) => (
-        <Tab
-          eventKey={tab.eventKey}
-          title={
-            tab.eventKey !== "add" ? (
-              <div className="">
-                {tab.eventKey !== "home" && (
-                  <button
-                    className="outline-none border-0 bg-transparent"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteTab(tab.eventKey);
-                    }}
-                  >
-                    <i className="bi bi-x"></i>
-                  </button>
-                )}
-                {tab.title}
-              </div>
-            ) : (
-              tab.title
-            )
-          }
-          key={tab.eventKey}
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div style={{ marginBottom: "30px" }}>
+          <Button variant="primary">
+            <i className="bi bi-play-circle-fill" /> Start Tests
+          </Button>{" "}
+          <Button variant="danger">
+            <i className="bi bi-play-circle-fill" /> Stop Tests
+          </Button>
+        </div>
+        <div>
+          <Button variant="secondary" disabled={true}>
+            <i className="bi bi-clock-history" /> Total Duration:{" "}
+            {totalDuration} seconds
+          </Button>
+        </div>
+      </div>
+      <div>
+        <Tabs
+          className="mb-3"
+          activeKey={key}
+          onSelect={(k: string | null) => {
+            if (k === "add") {
+              addTab();
+            } else if (k !== null) {
+              setKey(k);
+            }
+          }}
         >
-          {tab.content}
-        </Tab>
-      ))}
-    </Tabs>
+          {tabs.map((tab, index) => (
+            <Tab
+              eventKey={tab.eventKey}
+              title={
+                tab.eventKey !== "add" ? (
+                  <div className="">
+                    {tab.eventKey !== "home" && (
+                      <button
+                        className="outline-none border-0 bg-transparent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTab(tab.eventKey);
+                        }}
+                      >
+                        <i className="bi bi-x"></i>
+                      </button>
+                    )}
+                    {tab.title}
+                  </div>
+                ) : (
+                  tab.title
+                )
+              }
+              key={tab.eventKey}
+            >
+              {tab.content}
+            </Tab>
+          ))}
+        </Tabs>
+      </div>
+    </div>
   );
 };
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Doughnut, Line } from "react-chartjs-2";
 import { Statistics, TimeStatistics } from "../../common/Interfaces";
 import {
@@ -108,7 +108,7 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       download();
-    }, 700);
+    }, 3000);
 
     return () => clearTimeout(timeoutId);
   }, []);
@@ -129,7 +129,9 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
   const loss_options = {
     responsive: true,
     aspectRatio: 5,
-    animation: false as const,
+    animation: {
+      duration: 0,
+    },
     scales: {
       y: {
         title: {
@@ -197,7 +199,9 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
   const rate_options = {
     responsive: true,
     aspectRatio: 5,
-    animation: false as const,
+    animation: {
+      duration: 0,
+    },
     scales: {
       y: {
         title: {
@@ -254,7 +258,9 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
   const rtt_options = {
     responsive: true,
     aspectRatio: 5,
-    animation: false as const,
+    animation: {
+      duration: 0,
+    },
     scales: {
       y: {
         title: {
@@ -303,8 +309,10 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
 
   const frame_options = {
     responsive: true,
-    animation: false,
     aspectRatio: 5,
+    animation: {
+      duration: 0,
+    },
     plugins: {
       legend: {
         position: "top" as const,
