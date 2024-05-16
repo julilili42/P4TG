@@ -895,7 +895,7 @@ const DownloadPdfButton = React.memo(
     return (
       <Button
         onClick={handleDownloadPdf}
-        className="mb-1"
+        className="mb-1 w-100"
         variant="secondary"
         disabled={!visible}
       >

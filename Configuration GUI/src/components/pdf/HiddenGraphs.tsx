@@ -105,10 +105,13 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
     onConvert(data);
   }, []);
 
+  /*
+  Problem mit Generirung der Graphen, ein Datenpunkt fehlt? 
+  */
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       download();
-    }, 3000);
+    }, 0);
 
     return () => clearTimeout(timeoutId);
   }, []);

@@ -12,9 +12,7 @@ const TestSettings = () => {
 
     const handleDurationChange = (e: any) => {
       const num = parseInt(e.target.value);
-      if (!isNaN(num) && num >= 0) {
-        setDuration(num);
-      }
+      setDuration(num);
     };
 
     const handleSubmit = (e: any) => {
@@ -28,7 +26,8 @@ const TestSettings = () => {
           <Form.Group className="mb-3" controlId="numberInput">
             <Form.Label>Enter test duration</Form.Label>
             <Form.Control
-              type="text"
+              type="number"
+              min={0}
               value={duration}
               onChange={handleDurationChange}
               placeholder="Number of seconds"
@@ -98,15 +97,7 @@ const TestSettings = () => {
         flexDirection: "column",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <div style={{ marginBottom: "30px" }}>
-          <Button variant="primary">
-            <i className="bi bi-play-circle-fill" /> Start Tests
-          </Button>{" "}
-          <Button variant="danger">
-            <i className="bi bi-play-circle-fill" /> Stop Tests
-          </Button>
-        </div>
+      <div style={{ display: "flex", justifyContent: "end" }}>
         <div>
           <Button variant="secondary" disabled={true}>
             <i className="bi bi-clock-history" /> Total Duration:{" "}

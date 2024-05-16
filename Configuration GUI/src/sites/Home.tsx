@@ -76,6 +76,8 @@ const Home = () => {
   const [running, set_running] = useState(false);
   const [visual, set_visual] = useState(true);
 
+  const [imageData, setImageData] = useState<string[]>([]);
+
   const [pdfReady, setPdfReady] = useState(false);
 
   const [streams, set_streams] = useState<Stream[]>(
@@ -285,20 +287,15 @@ const Home = () => {
     set_overlay(false);
   };
 
-  const showDownloadButton = () => {
-    localStorage.setItem("pdfButton", "true");
-  };
-
-  const hideDownloadButton = () => {
-    localStorage.setItem("pdfButton", "false");
-  };
-
-  const shouldShowDownloadButton = () => {
-    return localStorage.getItem("pdfButton") == "true";
+  const shouldShowDownloadButton = (
+    running: boolean,
+    statistics: TimeStatistics
+  ) => {
+    return !running && Object.keys(statistics.tx_rate_l1).length > 0;
   };
 
   const handleGraphConvert = (imageData: string[]) => {
-    localStorage.setItem("imageData", JSON.stringify(imageData));
+    setImageData(imageData);
     setPdfReady(true);
   };
 
@@ -310,12 +307,7 @@ const Home = () => {
           <Col className={"text-end col-4"}>
             {running ? (
               <>
-                <Button
-                  type={"submit"}
-                  className="mb-1"
-                  variant="danger"
-                  onClick={showDownloadButton}
-                >
+                <Button type={"submit"} className="mb-1" variant="danger">
                   <i className="bi bi-stop-fill" /> Stop
                 </Button>{" "}
                 <Button onClick={restart} className="mb-1" variant="primary">
@@ -325,42 +317,42 @@ const Home = () => {
               </>
             ) : (
               <>
-                <Button type={"submit"} className="mb-1" variant="primary">
-                  <i className="bi bi-play-circle-fill" /> Start{" "}
-                </Button>{" "}
-                <Button
-                  onClick={() => {
-                    reset();
-                    hideDownloadButton();
-                    setPdfReady(false);
-                  }}
-                  className="mb-1"
-                  variant="warning"
-                >
-                  <i className="bi bi-trash-fill" />{" "}
-                  {translate("Reset", currentLanguage)}{" "}
-                </Button>{" "}
-                {shouldShowDownloadButton() ? (
-                  <>
-                    <HiddenGraphs
-                      data={time_statistics}
-                      stats={statistics}
-                      port_mapping={port_tx_rx_mapping}
-                      onConvert={handleGraphConvert}
-                    />
-                    <DownloadPdfButton
-                      stats={statistics}
-                      port_mapping={port_tx_rx_mapping}
-                      graph_images={
-                        JSON.parse(localStorage.getItem("imageData") ?? "") ??
-                        []
-                      }
-                      visible={pdfReady}
-                    />
-                  </>
-                ) : (
-                  <></>
-                )}
+                <div style={{ display: "inline-block" }}>
+                  <div>
+                    <Button type={"submit"} className="mb-1" variant="primary">
+                      <i className="bi bi-play-circle-fill" /> Start{" "}
+                    </Button>{" "}
+                    <Button
+                      onClick={() => {
+                        reset();
+                        setPdfReady(false);
+                      }}
+                      className="mb-1"
+                      variant="warning"
+                    >
+                      <i className="bi bi-trash-fill" />{" "}
+                      {translate("Reset", currentLanguage)}{" "}
+                    </Button>{" "}
+                  </div>
+                  {shouldShowDownloadButton(running, time_statistics) ? (
+                    <>
+                      <HiddenGraphs
+                        data={time_statistics}
+                        stats={statistics}
+                        port_mapping={port_tx_rx_mapping}
+                        onConvert={handleGraphConvert}
+                      />
+                      <DownloadPdfButton
+                        stats={statistics}
+                        port_mapping={port_tx_rx_mapping}
+                        graph_images={imageData}
+                        visible={pdfReady}
+                      />
+                    </>
+                  ) : (
+                    <></>
+                  )}
+                </div>
               </>
             )}
           </Col>
