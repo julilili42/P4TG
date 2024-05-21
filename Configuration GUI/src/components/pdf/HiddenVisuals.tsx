@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import React, { act, useCallback, useEffect, useRef } from "react";
 import { Doughnut, Line } from "react-chartjs-2";
 import { Statistics, TimeStatistics } from "../../common/Interfaces";
 
@@ -16,6 +16,12 @@ import {
   rate_options,
 } from "../../common/VisualUtils";
 
+type ChartRef = React.RefObject<HTMLDivElement>;
+
+const createRefArray = (length: number): ChartRef[] => {
+  return Array.from({ length }, () => React.createRef<HTMLDivElement>());
+};
+
 const HiddenGraphs = ({
   data,
   stats,
@@ -27,24 +33,20 @@ const HiddenGraphs = ({
   port_mapping: { [name: number]: number };
   onConvert: (data: string[]) => void;
 }) => {
-  const [
-    rttChartRef,
-    rateChartRef,
-    lossChartRef,
-    frameTypeChartRef,
-    ethernetTypeChartRef,
-    frameSizeChartRef,
-  ] = [
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null),
-  ];
+  // References to the summary graphs
+  const refsSummary = useRef<ChartRef[]>(createRefArray(6));
+
+  // References to the active port graphs, Object
+  const activePortRefs = activePorts(port_mapping).reduce(
+    (acc, port, index) => {
+      acc[port.tx] = createRefArray(6);
+      return acc;
+    },
+    {} as { [key: number]: ChartRef[] }
+  );
 
   const download = useCallback(
-    (refs: any) => {
+    (refs: ChartRef[]) => {
       const data: string[] = [];
 
       refs.forEach((ref: any, index: number) => {
@@ -65,31 +67,30 @@ const HiddenGraphs = ({
   );
 
   useEffect(() => {
-    const refs = [
-      rttChartRef,
-      rateChartRef,
-      lossChartRef,
-      frameTypeChartRef,
-      ethernetTypeChartRef,
-      frameSizeChartRef,
+    const allRefs = [
+      ...Object.values(activePortRefs).flat(),
+      ...refsSummary.current,
     ];
-    download(refs);
+    download(allRefs);
   }, []);
 
   return (
     <>
+      {activePorts(port_mapping).map((v, i) => {
+        return (
+          <HiddenGraph
+            data={data}
+            stats={stats}
+            port_mapping={{ [v.tx]: v.rx }}
+            chartRefs={activePortRefs[v.tx]}
+          />
+        );
+      })}
       <HiddenGraph
         data={data}
         stats={stats}
         port_mapping={port_mapping}
-        chartRefs={[
-          rttChartRef,
-          rateChartRef,
-          lossChartRef,
-          frameTypeChartRef,
-          ethernetTypeChartRef,
-          frameSizeChartRef,
-        ]}
+        chartRefs={refsSummary.current}
       />
     </>
   );
@@ -106,8 +107,14 @@ const HiddenGraph = ({
   port_mapping: { [name: number]: number };
   chartRefs: any[];
 }) => {
-  const [chartRef1, chartRef2, chartRef3, chartRef4, chartRef5, chartRef6] =
-    chartRefs;
+  const [
+    rateChartRef,
+    lossChartRef,
+    rttChartRef,
+    frameTypeChartRef,
+    ethernetTypeChartRef,
+    frameSizeChartRef,
+  ] = chartRefs;
 
   const [labels_loss, line_data_loss] = generateLineData(
     "packet_loss",
@@ -389,24 +396,24 @@ const HiddenGraph = ({
 
   return (
     <div className="hidden-div">
-      <Line data={rtt_data} options={rtt_options_hidden} ref={chartRef1} />
-      <Line options={rate_options_hidden} data={rate_data} ref={chartRef2} />
-      <Line options={loss_options_hidden} data={loss_data} ref={chartRef3} />
+      <Line options={rate_options_hidden} data={rate_data} ref={rateChartRef} />
+      <Line options={loss_options_hidden} data={loss_data} ref={lossChartRef} />
+      <Line data={rtt_data} options={rtt_options_hidden} ref={rttChartRef} />
       <Doughnut
         data={frame_type_data}
         options={frame_options_hidden}
         title={"Frame types"}
-        ref={chartRef4}
+        ref={frameTypeChartRef}
       />
       <Doughnut
         data={ethernet_type_data}
         options={frame_options_hidden}
-        ref={chartRef5}
+        ref={ethernetTypeChartRef}
       />
       <Doughnut
         data={frame_size_data}
         options={frame_options_hidden}
-        ref={chartRef6}
+        ref={frameSizeChartRef}
       />
     </div>
   );

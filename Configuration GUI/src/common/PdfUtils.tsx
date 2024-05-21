@@ -290,3 +290,19 @@ export const formatRowsT1 = (data: any) => {
 
   return rows;
 };
+
+export const splitArrayIntoChunks = <T,>(
+  array: T[],
+  chunkSize: number
+): T[][] => {
+  if (array.length % chunkSize !== 0) {
+    throw new Error(`Array length must be divisible by ${chunkSize}`);
+  }
+
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += chunkSize) {
+    result.push(array.slice(i, i + chunkSize));
+  }
+
+  return result;
+};

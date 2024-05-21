@@ -36,6 +36,7 @@ import {
   modes,
   encapsulation,
   addDots,
+  splitArrayIntoChunks,
 } from "../../common/PdfUtils";
 
 import { secondsToTime } from "../SendReceiveMonitor";
@@ -152,8 +153,12 @@ const DownloadPdfButton = React.memo(
       const doc = new jsPDF("p", "mm", [297, 210]);
       doc.setFont("helvetica", "normal");
 
-      const subHeaders = activePorts(port_mapping).map((v) => [
-        `Overview ${v.tx} --> ${v.rx}`,
+      // Split the graph images into chunks of 6, starting with each port pair and ending with the summary graphs
+      const all_network_graphs = splitArrayIntoChunks(graph_images, 6);
+
+      const subHeaders = activePorts(port_mapping).flatMap((v) => [
+        [`Overview ${v.tx} --> ${v.rx}`],
+        [`Network Graphs ${v.tx} --> ${v.rx}`],
       ]);
 
       subHeaders.unshift([`Network Graphs Summary`]);
@@ -173,7 +178,7 @@ const DownloadPdfButton = React.memo(
       for (let i = 0; i < subHeaders.length; i++) {
         // Skip Table of Contents in Table of Contents
         if (i > 0) {
-          let yPosition = 40 + (i - 1) * 12;
+          let yPosition = 40 + (i - 1) * 10;
           let title = subHeaders[i][0];
           let pageNumberText = "Seite " + (i + 1).toString();
 
@@ -452,9 +457,21 @@ const DownloadPdfButton = React.memo(
 
       doc.addPage();
       /* Network Graphs Summary */
-      graph_images.forEach((imageData, index) => {
-        doc.addImage(imageData, "JPEG", 15, 35 + 40 * index, 180, 36);
-      });
+      // Last element of all_network_graphs is the summary graphs
+      all_network_graphs[all_network_graphs.length - 1].forEach(
+        (imageData, index) => {
+          doc.addImage(
+            imageData,
+            "JPEG",
+            15,
+            35 + 40 * index,
+            180,
+            36,
+            "",
+            "FAST"
+          );
+        }
+      );
       doc.addPage();
 
       activePorts(port_mapping).map((v, i, array) => {
@@ -607,7 +624,22 @@ const DownloadPdfButton = React.memo(
             }
           )
         );
+        doc.addPage();
 
+        all_network_graphs[i].forEach((imageData, index) => {
+          doc.addImage(
+            imageData,
+            "JPEG",
+            15,
+            35 + 40 * index,
+            180,
+            36,
+            "",
+            "FAST"
+          );
+        });
+
+        // Don't add a new page if it's the last element
         if (i < array.length - 1) {
           doc.addPage();
         }
