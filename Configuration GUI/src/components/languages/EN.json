@@ -7,7 +7,7 @@
   "Import": "Import",
   "Export": "Export",
   "Add stream": "Add stream",
-  "InfoBox Settings Encapsulation": "P4TG supports various encapsulations for the generated IP/UDP packet.",
+  "InfoText Settings Encapsulation": "P4TG supports various encapsulations for the generated IP/UDP packet.",
   "Restart": "Restart",
   "Save": "Save"
 }

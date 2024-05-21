@@ -10,11 +10,6 @@ const TestSettings = () => {
   const DurationInput = () => {
     const [duration, setDuration] = useState(0);
 
-    const handleDurationChange = (e: any) => {
-      const num = parseInt(e.target.value);
-      setDuration(num);
-    };
-
     const handleSubmit = (e: any) => {
       e.preventDefault();
       setTotalDuration((prevTotal) => prevTotal + duration);
@@ -22,15 +17,18 @@ const TestSettings = () => {
 
     return (
       <>
-        <Form onSubmit={handleSubmit} style={{ width: "15%" }}>
+        <Form
+          onSubmit={handleSubmit}
+          style={{ width: "15%", position: "absolute", left: "850px" }}
+        >
           <Form.Group className="mb-3" controlId="numberInput">
             <Form.Label>Enter test duration</Form.Label>
             <Form.Control
               type="number"
               min={0}
-              value={duration}
-              onChange={handleDurationChange}
               placeholder="Number of seconds"
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
             />
           </Form.Group>
         </Form>
@@ -38,13 +36,15 @@ const TestSettings = () => {
       </>
     );
   };
+
   const [tabs, setTabs] = useState([
     {
       eventKey: "home",
       title: "Test 1",
       content: <DurationInput />,
+      titleEditable: false,
     },
-    { eventKey: "add", title: "+", content: "" },
+    { eventKey: "add", title: "+", content: "", titleEditable: false },
   ]);
 
   const addTab = () => {
@@ -53,6 +53,7 @@ const TestSettings = () => {
       eventKey: newTabKey,
       title: `Test ${tabs.length}`,
       content: <DurationInput />,
+      titleEditable: false,
     };
     const newTabs = [...tabs];
     newTabs.splice(tabs.length - 1, 0, newTab);
@@ -63,14 +64,37 @@ const TestSettings = () => {
   const deleteTab = (eventKey: string) => {
     const index = tabs.findIndex((tab) => tab.eventKey === eventKey);
     const newTabs = tabs.filter((tab) => tab.eventKey !== eventKey);
-    newTabs.map((tab, index) => {
-      tab.title !== "+" ? (tab.title = `Test ${index + 1}`) : (tab.title = "+");
+
+    // Update the tab titles to follow the default naming convention
+    newTabs.forEach((tab, i) => {
+      if (tab.title.startsWith("Test")) {
+        tab.title = `Test ${i + 1}`;
+      }
     });
+
     setTabs(newTabs);
     if (eventKey === key && newTabs.length >= 2) {
       const newIndex = index < newTabs.length - 1 ? index : index - 1;
       setKey(newTabs[newIndex].eventKey);
     }
+  };
+
+  const handleTitleChange = (eventKey: string, newTitle: string) => {
+    setTabs((prevTabs) =>
+      prevTabs.map((tab) =>
+        tab.eventKey === eventKey ? { ...tab, title: newTitle } : tab
+      )
+    );
+  };
+
+  const toggleTitleEdit = (eventKey: string) => {
+    setTabs((prevTabs) =>
+      prevTabs.map((tab) =>
+        tab.eventKey === eventKey
+          ? { ...tab, titleEditable: !tab.titleEditable }
+          : tab
+      )
+    );
   };
 
   useEffect(() => {
@@ -97,7 +121,13 @@ const TestSettings = () => {
         flexDirection: "column",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "end" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "start",
+          marginBottom: "20px",
+        }}
+      >
         <div>
           <Button variant="secondary" disabled={true}>
             <i className="bi bi-clock-history" /> Total Duration:{" "}
@@ -122,7 +152,7 @@ const TestSettings = () => {
               eventKey={tab.eventKey}
               title={
                 tab.eventKey !== "add" ? (
-                  <div className="">
+                  <div className="d-flex align-items-center">
                     {tab.eventKey !== "home" && (
                       <button
                         className="outline-none border-0 bg-transparent"
@@ -134,7 +164,31 @@ const TestSettings = () => {
                         <i className="bi bi-x"></i>
                       </button>
                     )}
-                    {tab.title}
+                    {tab.titleEditable ? (
+                      <input
+                        type="text"
+                        value={tab.title}
+                        onChange={(e) =>
+                          handleTitleChange(tab.eventKey, e.target.value)
+                        }
+                        onBlur={() => toggleTitleEdit(tab.eventKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            toggleTitleEdit(tab.eventKey);
+                          }
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() => toggleTitleEdit(tab.eventKey)}
+                        style={{
+                          color: "black",
+                        }} // why is it not black???
+                      >
+                        {tab.title}
+                      </span>
+                    )}
                   </div>
                 ) : (
                   tab.title

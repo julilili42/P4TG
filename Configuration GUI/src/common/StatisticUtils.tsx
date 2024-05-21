@@ -3,7 +3,7 @@ import {
   StreamSettings,
   Stream,
   TimeStatistics,
-} from "../common/Interfaces";
+} from "./Interfaces";
 export const get_frame_types = (
   stats: Statistics,
   port_mapping: { [name: number]: number },
@@ -329,4 +329,26 @@ export const get_rtt = (
     Object.keys(ret_data[0]).map((v) => secondsToTime(parseInt(v))),
     Object.values(ret_data[0]),
   ];
+};
+export const formatTime = (): string => {
+  const LeadingZero = (num: number) => {
+    return num < 10 ? "0" + num : num;
+  };
+
+  const date = new Date();
+
+  const showDate =
+    LeadingZero(date.getDate()) +
+    "." +
+    LeadingZero(date.getMonth() + 1) +
+    "." +
+    LeadingZero(date.getFullYear());
+
+  const showTime =
+    LeadingZero(date.getHours()) +
+    ":" +
+    LeadingZero(date.getMinutes()) +
+    ":" +
+    LeadingZero(date.getSeconds());
+  return showDate + " " + showTime;
 };

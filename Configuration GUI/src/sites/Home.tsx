@@ -38,7 +38,8 @@ import {
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
 import translate from "../components/Translate";
-import HiddenGraphs from "../components/pdf/HiddenGraphs";
+import HiddenGraphs from "../components/pdf/HiddenVisuals";
+import HiddenGraph from "../components/pdf/HiddenVisuals";
 
 styled(Row)`
   display: flex;
@@ -77,8 +78,6 @@ const Home = () => {
   const [visual, set_visual] = useState(true);
 
   const [imageData, setImageData] = useState<string[]>([]);
-
-  const [pdfReady, setPdfReady] = useState(false);
 
   const [streams, set_streams] = useState<Stream[]>(
     JSON.parse(localStorage.getItem("streams") ?? "") ?? []
@@ -294,9 +293,8 @@ const Home = () => {
     return !running && Object.keys(statistics.tx_rate_l1).length > 0;
   };
 
-  const handleGraphConvert = (imageData: string[]) => {
-    setImageData(imageData);
-    setPdfReady(true);
+  const handleGraphConvert = (newImageData: string[]) => {
+    setImageData(newImageData);
   };
 
   return (
@@ -325,7 +323,6 @@ const Home = () => {
                     <Button
                       onClick={() => {
                         reset();
-                        setPdfReady(false);
                       }}
                       className="mb-1"
                       variant="warning"
@@ -346,7 +343,6 @@ const Home = () => {
                         stats={statistics}
                         port_mapping={port_tx_rx_mapping}
                         graph_images={imageData}
-                        visible={pdfReady}
                       />
                     </>
                   ) : (

@@ -271,6 +271,7 @@ const Settings = () => {
     <Loader loaded={loaded}>
       <Row>
         <Col className={"col-2"}>
+          <Form.Text className="text-muted">&nbsp;</Form.Text>{" "}
           <Form.Select
             disabled={running}
             required
@@ -312,6 +313,18 @@ const Settings = () => {
               Monitor
             </option>
           </Form.Select>
+        </Col>
+        <Col>
+          <Form>
+            <Form.Text className="text-muted">Enter Test Duration</Form.Text>
+            <Form.Group className="mb-3" controlId="numberInput">
+              <Form.Control
+                type="number"
+                min={0}
+                placeholder="Number of seconds"
+              />
+            </Form.Group>
+          </Form>
         </Col>
         <Col>
           <InfoBox>
@@ -406,7 +419,7 @@ const Settings = () => {
                     <InfoBox>
                       <p>
                         {translate(
-                          "InfoBox Settings Encapsulation",
+                          "InfoText Settings Encapsulation",
                           currentLanguage
                         )}
                       </p>

@@ -1,120 +1,113 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Doughnut, Line } from "react-chartjs-2";
 import { Statistics, TimeStatistics } from "../../common/Interfaces";
+
 import {
   get_rtt,
-  secondsToTime,
   get_frame_types,
   get_frame_stats,
-} from "../StatisticUtils";
+  activePorts,
+} from "../../common/StatisticUtils";
+import {
+  generateLineData,
+  rtt_options,
+  frame_options,
+  loss_options,
+  rate_options,
+} from "../../common/VisualUtils";
 
-interface HiddenGraphsProps {
-  data: TimeStatistics;
-  stats: Statistics;
-  port_mapping: { [name: number]: number };
-  onConvert: (data: string[]) => void;
-}
-
-const generateLineData = (
-  data_key: string,
-  use_key: boolean,
-  data: TimeStatistics,
-  port_mapping: { [name: number]: number }
-): [string[], number[]] => {
-  let cum_data: { [name: number]: number }[] = [];
-
-  if (data_key in data) {
-    if (use_key) {
-      Object.keys(port_mapping).map((v) => {
-        // @ts-ignore
-        if (v in data[data_key]) {
-          // @ts-ignore
-          cum_data.push(data[data_key][v]);
-        }
-      });
-    } else {
-      Object.values(port_mapping).map((v) => {
-        // @ts-ignore
-        if (v in data[data_key]) {
-          // @ts-ignore
-          cum_data.push(data[data_key][v]);
-        }
-      });
-    }
-  }
-
-  let ret_data = cum_data.reduce((acc, current) => {
-    const key = Object.keys(current);
-    const found = Object.keys(acc);
-
-    key.forEach((k) => {
-      if (Object.keys(acc).includes(k)) {
-        // @ts-ignore
-        acc[k] += current[k];
-      } else {
-        // @ts-ignore
-        acc[k] = current[k];
-      }
-    });
-
-    return acc;
-  }, {});
-
-  return [
-    Object.keys(ret_data).map((v) => secondsToTime(parseInt(v))),
-    Object.values(ret_data),
-  ];
-};
-
-const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
+const HiddenGraphs = ({
   data,
   stats,
   port_mapping,
   onConvert,
+}: {
+  data: TimeStatistics;
+  stats: Statistics;
+  port_mapping: { [name: number]: number };
+  onConvert: (data: string[]) => void;
 }) => {
-  const chartRef1 = useRef(null);
-  const chartRef2 = useRef(null);
-  const chartRef3 = useRef(null);
-  const chartRef4 = useRef(null);
-  const chartRef5 = useRef(null);
-  const chartRef6 = useRef(null);
+  const [
+    rttChartRef,
+    rateChartRef,
+    lossChartRef,
+    frameTypeChartRef,
+    ethernetTypeChartRef,
+    frameSizeChartRef,
+  ] = [
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+    useRef(null),
+  ];
 
-  const download = useCallback(() => {
-    const refs = [
-      chartRef1,
-      chartRef2,
-      chartRef3,
-      chartRef4,
-      chartRef5,
-      chartRef6,
-    ];
-    const data: string[] = [];
+  const download = useCallback(
+    (refs: any) => {
+      const data: string[] = [];
 
-    refs.forEach((ref, index) => {
-      const link = document.createElement("a");
-      link.download = `chart-${index + 1}.png`;
-      if (ref.current) {
-        // @ts-ignore
-        link.href = ref.current.toBase64Image();
-        data.push(link.href);
-      } else {
-        console.error("Error in rendering" + index + 1 + "th chart");
-      }
-    });
+      refs.forEach((ref: any, index: number) => {
+        const link = document.createElement("a");
+        link.download = `chart-${index + 1}.png`;
+        if (ref.current) {
+          // @ts-ignore
+          link.href = ref.current.toBase64Image();
+          data.push(link.href);
+        } else {
+          console.error("Error in rendering" + index + 1 + "th chart");
+        }
+      });
 
-    onConvert(data);
-  }, []);
+      onConvert(data);
+    },
+    [onConvert]
+  );
 
-  /*
-  Problem mit Generirung der Graphen, ein Datenpunkt fehlt? 
-  */
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      download();
-    }, 0);
-
-    return () => clearTimeout(timeoutId);
+    const refs = [
+      rttChartRef,
+      rateChartRef,
+      lossChartRef,
+      frameTypeChartRef,
+      ethernetTypeChartRef,
+      frameSizeChartRef,
+    ];
+    download(refs);
   }, []);
+
+  return (
+    <>
+      <HiddenGraph
+        data={data}
+        stats={stats}
+        port_mapping={port_mapping}
+        chartRefs={[
+          rttChartRef,
+          rateChartRef,
+          lossChartRef,
+          frameTypeChartRef,
+          ethernetTypeChartRef,
+          frameSizeChartRef,
+        ]}
+      />
+    </>
+  );
+};
+
+const HiddenGraph = ({
+  data,
+  stats,
+  port_mapping,
+  chartRefs,
+}: {
+  data: TimeStatistics;
+  stats: Statistics;
+  port_mapping: { [name: number]: number };
+  chartRefs: any[];
+}) => {
+  const [chartRef1, chartRef2, chartRef3, chartRef4, chartRef5, chartRef6] =
+    chartRefs;
 
   const [labels_loss, line_data_loss] = generateLineData(
     "packet_loss",
@@ -129,40 +122,11 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
     port_mapping
   );
 
-  const loss_options = {
-    responsive: true,
+  const loss_options_hidden = {
+    ...loss_options,
     aspectRatio: 5,
     animation: {
       duration: 0,
-    },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: "#Packets",
-        },
-        suggestedMin: 0,
-        beginAtZero: true,
-      },
-      x: {
-        title: {
-          display: true,
-          text: "Time",
-        },
-        ticks: {
-          source: "auto",
-          autoSkip: true,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        position: "top" as const,
-      },
-      title: {
-        display: false,
-        text: "",
-      },
     },
   };
 
@@ -199,43 +163,13 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
     port_mapping
   );
 
-  const rate_options = {
-    responsive: true,
+  const rate_options_hidden = {
+    ...rate_options,
     aspectRatio: 5,
     animation: {
       duration: 0,
     },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: "Gbit/s",
-        },
-        suggestedMin: 0,
-        beginAtZero: true,
-      },
-      x: {
-        title: {
-          display: true,
-          text: "Time",
-        },
-        ticks: {
-          source: "auto",
-          autoSkip: true,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        position: "top" as const,
-      },
-      title: {
-        display: false,
-        text: "",
-      },
-    },
   };
-
   const rate_data = {
     labels: labels_tx,
     datasets: [
@@ -258,40 +192,11 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
 
   const [labels_rtt, line_data_rtt] = get_rtt(data, port_mapping);
 
-  const rtt_options = {
-    responsive: true,
+  const rtt_options_hidden = {
+    ...rtt_options,
     aspectRatio: 5,
     animation: {
       duration: 0,
-    },
-    scales: {
-      y: {
-        title: {
-          display: true,
-          text: "μs",
-        },
-        suggestedMin: 0,
-        beginAtZero: true,
-      },
-      x: {
-        title: {
-          display: true,
-          text: "Time",
-        },
-        ticks: {
-          source: "auto",
-          autoSkip: true,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        position: "top" as const,
-      },
-      title: {
-        display: false,
-        text: "",
-      },
     },
   };
 
@@ -310,21 +215,9 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
 
   let frame_type_label = ["Multicast", "Broadcast", "Unicast", "VxLAN"];
 
-  const frame_options = {
-    responsive: true,
+  const frame_options_hidden = {
+    ...frame_options,
     aspectRatio: 5,
-    animation: {
-      duration: 0,
-    },
-    plugins: {
-      legend: {
-        position: "top" as const,
-      },
-      title: {
-        display: false,
-        text: "Frame type",
-      },
-    },
   };
 
   const frame_type_data = {
@@ -496,23 +389,23 @@ const HiddenGraphs: React.FC<HiddenGraphsProps> = ({
 
   return (
     <div className="hidden-div">
-      <Line data={rtt_data} options={rtt_options} ref={chartRef1} />
-      <Line options={rate_options} data={rate_data} ref={chartRef2} />
-      <Line options={loss_options} data={loss_data} ref={chartRef3} />
+      <Line data={rtt_data} options={rtt_options_hidden} ref={chartRef1} />
+      <Line options={rate_options_hidden} data={rate_data} ref={chartRef2} />
+      <Line options={loss_options_hidden} data={loss_data} ref={chartRef3} />
       <Doughnut
         data={frame_type_data}
-        options={frame_options}
+        options={frame_options_hidden}
         title={"Frame types"}
         ref={chartRef4}
       />
       <Doughnut
         data={ethernet_type_data}
-        options={frame_options}
+        options={frame_options_hidden}
         ref={chartRef5}
       />
       <Doughnut
         data={frame_size_data}
-        options={frame_options}
+        options={frame_options_hidden}
         ref={chartRef6}
       />
     </div>
