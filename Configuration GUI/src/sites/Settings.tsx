@@ -38,7 +38,7 @@ import { GitHub } from "./Home";
 import StreamSettingsList from "../components/settings/StreamSettingsList";
 import StreamElement from "../components/settings/StreamElement";
 import { validateStreams, validateStreamSettings } from "../common/Validators";
-import translate from "../components/Translate";
+import translate from "../components/translation/Translate";
 
 export const StyledRow = styled.tr`
   display: flex;
@@ -51,7 +51,11 @@ export const StyledCol = styled.td`
   text-indent: 5px;
 `;
 
-const Settings = () => {
+const Settings = ({
+  onTestChange,
+}: {
+  onTestChange?: (event: any) => void;
+}) => {
   const [ports, set_ports] = useState<
     {
       pid: number;
@@ -159,12 +163,12 @@ const Settings = () => {
     set_mode(GenerationMode.NONE);
     set_port_tx_rx_mapping({});
 
-    alert("Reset complete.");
+    alert(translate("Reset complete.", currentLanguage));
   };
 
   const addStream = () => {
     if (streams.length > 6) {
-      alert("Only 7 different streams allowed.");
+      alert(translate("Only 7 different streams allowed.", currentLanguage));
     } else {
       let id = 0;
 
@@ -227,7 +231,7 @@ const Settings = () => {
         !validateStreams(data.streams) ||
         !validateStreamSettings(data.stream_settings)
       ) {
-        alert("Settings not valid.");
+        alert(translate("Settings not valid.", currentLanguage));
         // @ts-ignore
         ref.current.value = "";
       } else {
@@ -244,7 +248,7 @@ const Settings = () => {
           JSON.stringify(data.port_tx_rx_mapping)
         );
 
-        alert("Import successfull. Reloading...");
+        alert(translate("Import successfull. Reloading...", currentLanguage));
 
         window.location.reload();
       }
@@ -264,6 +268,19 @@ const Settings = () => {
     }, 100);
     return () => clearInterval(interval);
   }, [currentLanguage]);
+
+  const [duration, setDuration] = useState(0);
+
+  const handleInputChange = (event) => {
+    setDuration(event.target.value);
+  };
+
+  const handleDurationChange = (event: any) => {
+    event.preventDefault();
+    if (onTestChange) {
+      onTestChange(duration);
+    }
+  };
 
   // @ts-ignore
   // @ts-ignore
@@ -315,13 +332,17 @@ const Settings = () => {
           </Form.Select>
         </Col>
         <Col>
-          <Form>
-            <Form.Text className="text-muted">Enter Test Duration</Form.Text>
+          <Form onSubmit={handleDurationChange}>
+            <Form.Text className="text-muted">
+              {translate("Enter Test Duration", currentLanguage)}
+            </Form.Text>
             <Form.Group className="mb-3" controlId="numberInput">
               <Form.Control
                 type="number"
                 min={0}
-                placeholder="Number of seconds"
+                placeholder={translate("Number of seconds", currentLanguage)}
+                onChange={handleInputChange}
+                required
               />
             </Form.Group>
           </Form>
@@ -395,7 +416,7 @@ const Settings = () => {
               <thead className={"table-dark"}>
                 <tr>
                   <th>Stream-ID</th>
-                  <th>Frame Size</th>
+                  <th>{translate("Frame Size", currentLanguage)}</th>
                   <th>Rate</th>
                   <th>Mode</th>
                   <th>
@@ -409,23 +430,26 @@ const Settings = () => {
                         >
                           RFC 7348
                         </a>
-                        ) adds an additional outer Ethernet, IP and VxLAN header
-                        to the packet.
-                      </p>
-                    </InfoBox>
-                  </th>
-                  <th>
-                    Encapsulation &nbsp;
-                    <InfoBox>
-                      <p>
+                        ){" "}
                         {translate(
-                          "InfoText Settings Encapsulation",
+                          "adds an additional outer Ethernet, IP and VxLAN header to the packet.",
                           currentLanguage
                         )}
                       </p>
                     </InfoBox>
                   </th>
-                  <th>Options</th>
+                  <th>
+                    {translate("Encapsulation", currentLanguage)} &nbsp;
+                    <InfoBox>
+                      <p>
+                        {translate(
+                          "P4TG supports various encapsulations for the generated IP/UDP packet.",
+                          currentLanguage
+                        )}
+                      </p>
+                    </InfoBox>
+                  </th>
+                  <th>{translate("Options", currentLanguage)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -503,7 +527,9 @@ const Settings = () => {
                               set_port_tx_rx_mapping(current);
                             }}
                           >
-                            <option value={-1}>Select RX Port</option>
+                            <option value={-1}>
+                              {translate("Select RX Port", currentLanguage)}
+                            </option>
                             {ports.map((v, i) => {
                               if (v.loopback == "BF_LPBK_NONE") {
                                 return (

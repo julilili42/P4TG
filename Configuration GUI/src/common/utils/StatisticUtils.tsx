@@ -3,7 +3,7 @@ import {
   StreamSettings,
   Stream,
   TimeStatistics,
-} from "./Interfaces";
+} from "../Interfaces";
 export const get_frame_types = (
   stats: Statistics,
   port_mapping: { [name: number]: number },

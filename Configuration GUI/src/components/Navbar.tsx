@@ -26,7 +26,7 @@ import { Row } from "react-bootstrap";
 
 import P4TGLogo from "../assets/p4tg_logo_white.png";
 import config from "../config";
-import Selector from "./LanguageSelector";
+import Selector from "./translation/LanguageSelector";
 styled(Link)<{ active?: boolean }>`
   text-decoration: none;
   margin-right: 15px;

@@ -37,9 +37,8 @@ import {
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
-import translate from "../components/Translate";
+import translate from "../components/translation/Translate";
 import HiddenGraphs from "../components/pdf/HiddenVisuals";
-import HiddenGraph from "../components/pdf/HiddenVisuals";
 
 styled(Row)`
   display: flex;
@@ -315,7 +314,7 @@ const Home = () => {
               </>
             ) : (
               <>
-                <div style={{ display: "inline-block" }}>
+                <div style={{ display: "inline-block", position: "relative" }}>
                   <div>
                     <Button type={"submit"} className="mb-1" variant="primary">
                       <i className="bi bi-play-circle-fill" /> Start{" "}
@@ -366,7 +365,7 @@ const Home = () => {
       </Form>
 
       <Tabs defaultActiveKey="Summary" className="mt-3">
-        <Tab eventKey="Summary" title="Summary">
+        <Tab eventKey="Summary" title={translate("Summary", currentLanguage)}>
           <StatView
             stats={statistics}
             time_stats={time_statistics}

@@ -1,47 +1,46 @@
 import { useEffect, useState } from "react";
 import { Button, Tab, Tabs } from "react-bootstrap";
 import Settings from "../sites/Settings";
-import Form from "react-bootstrap/Form";
+import translate from "./translation/Translate";
 
 const TestSettings = () => {
   const [key, setKey] = useState("home");
   const [totalDuration, setTotalDuration] = useState(0);
+  const [tabDurations, setTabDurations] = useState<{ [key: string]: number }>(
+    {}
+  );
 
-  const DurationInput = () => {
-    const [duration, setDuration] = useState(0);
+  const [currentLanguage, setCurrentLanguage] = useState(
+    localStorage.getItem("language") || "en-US"
+  );
 
-    const handleSubmit = (e: any) => {
-      e.preventDefault();
-      setTotalDuration((prevTotal) => prevTotal + duration);
-    };
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const storedLanguage = localStorage.getItem("language") || "en-US";
+      if (storedLanguage != currentLanguage) {
+        setCurrentLanguage(storedLanguage);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [currentLanguage]);
 
-    return (
-      <>
-        <Form
-          onSubmit={handleSubmit}
-          style={{ width: "15%", position: "absolute", left: "850px" }}
-        >
-          <Form.Group className="mb-3" controlId="numberInput">
-            <Form.Label>Enter test duration</Form.Label>
-            <Form.Control
-              type="number"
-              min={0}
-              placeholder="Number of seconds"
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-            />
-          </Form.Group>
-        </Form>
-        <Settings />
-      </>
-    );
+  const handleTestChange = (duration: number, tabKey: string) => {
+    setTotalDuration(totalDuration + Number(duration));
+    setTabDurations((prev) => ({
+      ...prev,
+      [tabKey]: duration,
+    }));
   };
 
   const [tabs, setTabs] = useState([
     {
       eventKey: "home",
       title: "Test 1",
-      content: <DurationInput />,
+      content: (
+        <Settings
+          onTestChange={(duration) => handleTestChange(duration, "home")}
+        />
+      ),
       titleEditable: false,
     },
     { eventKey: "add", title: "+", content: "", titleEditable: false },
@@ -52,7 +51,11 @@ const TestSettings = () => {
     const newTab = {
       eventKey: newTabKey,
       title: `Test ${tabs.length}`,
-      content: <DurationInput />,
+      content: (
+        <Settings
+          onTestChange={(duration) => handleTestChange(duration, newTabKey)}
+        />
+      ),
       titleEditable: false,
     };
     const newTabs = [...tabs];
@@ -77,6 +80,14 @@ const TestSettings = () => {
       const newIndex = index < newTabs.length - 1 ? index : index - 1;
       setKey(newTabs[newIndex].eventKey);
     }
+
+    // Remove the duration entry for the deleted tab
+    setTabDurations((prev) => {
+      const newDurations = { ...prev };
+      // @ts-ignore
+      delete newDurations[eventKey];
+      return newDurations;
+    });
   };
 
   const handleTitleChange = (eventKey: string, newTitle: string) => {
@@ -130,8 +141,9 @@ const TestSettings = () => {
       >
         <div>
           <Button variant="secondary" disabled={true}>
-            <i className="bi bi-clock-history" /> Total Duration:{" "}
-            {totalDuration} seconds
+            <i className="bi bi-clock-history" />{" "}
+            {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
+            seconds
           </Button>
         </div>
       </div>
@@ -184,7 +196,7 @@ const TestSettings = () => {
                         onDoubleClick={() => toggleTitleEdit(tab.eventKey)}
                         style={{
                           color: "black",
-                        }} // why is it not black???
+                        }}
                       >
                         {tab.title}
                       </span>

@@ -1,12 +1,8 @@
 import DE from "./languages/DE.json";
-import EN from "./languages/EN.json";
 import { userLangToTranslateCode } from "./LanguageSelector";
 
-type LanguagePack = Record<string, string>;
-
-const languages: Record<string, LanguagePack> = {
+const languages: { [key: string]: { [key: string]: string } } = {
   DE,
-  EN,
 };
 
 const userLang = navigator.language;
@@ -17,7 +13,9 @@ const translate = (
     localStorage.getItem("language") ?? userLang
   )
 ): string => {
-  return languages[userLangToTranslateCode(language)][key] || key;
+  const langCode = userLangToTranslateCode(language);
+  if (langCode === "EN") return key; // Return the key itself for English
+  return languages[langCode]?.[key] || key;
 };
 
 export default translate;

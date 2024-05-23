@@ -3,12 +3,39 @@ import {
   formatFrameCount,
   get_frame_stats,
   formatNanoSeconds,
+  activePorts,
+  getStreamIDsByPort,
+  formatTime,
+  secondsToTime,
 } from "./StatisticUtils";
-
-import { Statistics } from "./Interfaces";
+import { Statistics, Stream, StreamSettings } from "../Interfaces";
 import { UserOptions } from "jspdf-autotable";
 import { jsPDF } from "jspdf";
-import translate from "../components/Translate";
+import translate from "../../components/translation/Translate";
+
+const encapsulation: { [key: number]: string } = {
+  0: "None",
+  1: "VLAN (+4 byte)",
+  2: "Q-in-Q (+8 byte)",
+  3: "MPLS (+4 byte / LSE)",
+};
+
+const getPortAndChannelFromPid = (
+  pid: number | string,
+  ports: {
+    pid: number;
+    port: number;
+    channel: number;
+    loopback: string;
+    status: boolean;
+  }[]
+) => {
+  const numericPid = typeof pid === "string" ? parseInt(pid) : pid;
+  const pidData = ports.find((p) => p.pid === numericPid);
+  return pidData
+    ? { port: pidData.port, channel: pidData.channel }
+    : { port: "N/A", channel: "N/A" };
+};
 
 export const addDots = (
   doc: jsPDF,
@@ -25,21 +52,134 @@ export const addDots = (
   return dots;
 };
 
+export const createTableOfContents = (
+  doc: jsPDF,
+  subHeaders: string[][],
+  startX = 15,
+  buffer = 2
+) => {
+  doc.setFontSize(12);
+  let currentPage = 1;
+
+  // Start position for the page number with buffer accounted
+  const targetX = 180 - buffer;
+
+  for (let i = 0; i < subHeaders.length; i++) {
+    // Skip Table of Contents in Table of Contents
+    if (i > 0) {
+      let yPosition = 40 + (i - 1) * 10;
+      let title = subHeaders[i][0];
+      let pageNumberText = "Seite " + (i + 1).toString();
+
+      // Add the chapter title
+      doc.textWithLink(title, startX, yPosition, {
+        pageNumber: currentPage,
+      });
+
+      // Add the page number
+      doc.setFont("helvetica", "bold");
+      doc.textWithLink(pageNumberText, targetX + buffer, yPosition, {
+        pageNumber: currentPage,
+      });
+      doc.setFont("helvetica", "normal");
+
+      // Calculate and add the dots with buffer space
+      let textWidth = doc.getTextWidth(title);
+      let dots = addDots(doc, title, targetX, startX, buffer);
+      doc.text(dots, startX + textWidth + buffer, yPosition);
+    }
+    currentPage++;
+  }
+};
+
+export const createTestExplanation = (
+  doc: jsPDF,
+  text: string,
+  startX = 20,
+  startY = 35,
+  maxWidth = 170
+) => {
+  const splitTextToSize = doc.splitTextToSize(text, maxWidth);
+  doc.text(splitTextToSize, startX, startY);
+};
+
+export const addHeadersAndFooters = (doc: jsPDF, elapsed_time: number) => {
+  const totalPages = doc.getNumberOfPages();
+
+  for (let index = 1; index <= totalPages; index++) {
+    doc.setPage(index);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Test duration and report generation time
+    doc.text("Report was generated on: " + formatTime(), 5, 5, {
+      align: "left",
+    });
+    doc.text(
+      "Test duration: " + secondsToTime(elapsed_time),
+      pageWidth - 5,
+      5,
+      {
+        align: "right",
+      }
+    );
+
+    // Footer Page Number
+    doc.text(
+      "Page " + index + " of " + totalPages,
+      pageWidth - 5,
+      pageHeight - 5,
+      {
+        align: "right",
+      }
+    );
+
+    // Github Link
+    doc.textWithLink("P4TG@Github", pageWidth / 2, pageHeight - 5, {
+      url: "https://github.com/uni-tue-kn/P4TG",
+      align: "center",
+    });
+
+    // P4TG Network Report Header
+    doc.setFontSize(17);
+    doc.setFont("helvetica", "bold");
+    doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+    doc.setFont("helvetica", "normal");
+  }
+};
+
+export const addSubHeaders = (doc: jsPDF, subHeaders: string[][]) => {
+  let currentPage = 1;
+
+  // Add Subheaders to every page
+  for (let i = 0; i < subHeaders.length; i++) {
+    doc.setPage(currentPage);
+    doc.setFontSize(12);
+
+    doc.text(subHeaders[i], 105, 25, { align: "center" });
+
+    currentPage++;
+  }
+};
+
 export const shouldDrawLine = (
   columnIndex: number,
   indicesToDraw: number[]
 ): boolean => {
   return indicesToDraw.includes(columnIndex);
 };
+
 export const createAutoTableConfig = (
   doc: jsPDF,
   columns: string[],
   rows: (string | number | boolean)[][],
   columnStyles: { [key: number]: { cellWidth: number } },
   indicesToDraw: number[],
-  options?: any // Indices, an denen Linien gezeichnet werden sollen
+  options?: any,
+  applyRttRowColSkip: boolean = false
 ): UserOptions => {
-  // Modifiziere das UserOptions Objekt, um die didDrawCell Logik zu integrieren
   const modifiedOptions: UserOptions = {
     ...options,
     head: [columns],
@@ -47,7 +187,13 @@ export const createAutoTableConfig = (
     theme: "plain",
     columnStyles: columnStyles,
     didDrawCell: (data: any) => {
-      if (shouldDrawLine(data.column.index, indicesToDraw)) {
+      const shouldDraw =
+        !applyRttRowColSkip ||
+        (applyRttRowColSkip &&
+          ((data.column.index != 3 && data.column.index != 4) ||
+            data.row.index <= 3));
+
+      if (shouldDraw && shouldDrawLine(data.column.index, indicesToDraw)) {
         doc.setDrawColor(0);
         doc.setLineWidth(0.1);
         doc.line(
@@ -63,7 +209,94 @@ export const createAutoTableConfig = (
   return modifiedOptions;
 };
 
-export const columnsT0 = [
+export const generateStreamStatusArray = (
+  indices: number[],
+  arraySize: number
+): string[] =>
+  Array.from({ length: arraySize }, (_, i) =>
+    indices.includes(i + 1) ? "on" : "off"
+  );
+
+export const formatPortStreamCols = (streams: Stream[]): string[] => {
+  const cols = ["TX Port", "RX Port"].concat(
+    streams.map((stream) => `Stream ${stream.app_id}`)
+  );
+  return cols;
+};
+
+export const formatPortStreamRows = (
+  port_mapping: { [name: number]: number },
+  ports: {
+    pid: number;
+    port: number;
+    channel: number;
+    loopback: string;
+    status: boolean;
+  }[],
+  stream_settings: StreamSettings[],
+  streams: Stream[],
+  portStreamCols: string[]
+) => {
+  return activePorts(port_mapping).map((stream) => {
+    const portInfo = [
+      `${getPortAndChannelFromPid(stream.tx, ports).port} (${stream.tx})`,
+      `${getPortAndChannelFromPid(stream.rx, ports).port} (${stream.rx})`,
+    ];
+
+    const streamIDs = getStreamIDsByPort(stream.tx, stream_settings, streams);
+    const streamStatus = generateStreamStatusArray(
+      streamIDs,
+      portStreamCols.length - 2
+    );
+
+    return portInfo.concat(streamStatus);
+  });
+};
+
+export const formatActivePortsRows = (
+  port_mapping: { [name: number]: number },
+  ports: {
+    pid: number;
+    port: number;
+    channel: number;
+    loopback: string;
+    status: boolean;
+  }[]
+): (string | number)[][] => {
+  const rows = [];
+
+  for (const [txPid, rxPid] of Object.entries(port_mapping)) {
+    const txData = getPortAndChannelFromPid(txPid, ports);
+    const rxData = getPortAndChannelFromPid(rxPid, ports);
+
+    rows.push([
+      txData.port,
+      txData.channel,
+      txPid,
+      rxData.port,
+      rxData.channel,
+      rxPid,
+    ]);
+  }
+  return rows;
+};
+
+export const formatActiveStreamRows = (
+  streams: Stream[]
+): (string | number | boolean)[][] => {
+  const row = streams.map((stream) => [
+    stream.app_id,
+    stream.frame_size + " bytes",
+    stream.traffic_rate + " Gbps",
+    stream.burst == 1 ? "IAT Precision" : "Rate Precision",
+    stream.vxlan,
+    encapsulation[stream.encapsulation],
+    stream.number_of_lse,
+  ]);
+  return row;
+};
+
+export const activePortsCols = [
   "Port TX",
   "Channel TX",
   "PID TX",
@@ -72,7 +305,7 @@ export const columnsT0 = [
   "PID RX",
 ];
 
-export const columnsT2 = [
+export const frameEthernetCols = [
   "Frame Type",
   "#TX Count",
   "#RX Count",
@@ -82,7 +315,7 @@ export const columnsT2 = [
   "#RX Count",
 ];
 
-export const rowT2 = (
+export const frameEthernetRow = (
   stats: Statistics,
   mapping: { [name: number]: number },
   label1: string,
@@ -159,7 +392,7 @@ export const frameSizes = [
   ["Total"],
 ];
 
-export const columnsT3 = [
+export const frameSizeCountCols = [
   "Frame Size",
   "#TX Count",
   "%",
@@ -169,7 +402,7 @@ export const columnsT3 = [
   "%",
 ];
 
-export const rowT3 = (
+export const frameSizeCountRow = (
   stats: Statistics,
   mapping: { [name: number]: number },
   label: string,
@@ -211,7 +444,7 @@ export const modes: { [key: number]: string } = {
   4: "Monitor",
 };
 
-export const columnsT7 = [
+export const activeStreamCols = [
   "Stream ID",
   "Frame Size",
   "Rate",
@@ -221,16 +454,9 @@ export const columnsT7 = [
   "Options",
 ];
 
-export const encapsulation: { [key: number]: string } = {
-  0: "None",
-  1: "VLAN (+4 byte)",
-  2: "Q-in-Q (+8 byte)",
-  3: "MPLS (+4 byte / LSE)",
-};
+export const frameStatsRTTCols = ["Type", "", "", "Type", ""];
 
-export const columnsT1 = ["Type", "", "", "Type", ""];
-
-export const formatRowsT1 = (data: any) => {
+export const formatFrameStatsRTTRows = (data: any) => {
   const {
     lost_packets,
     total_rx,

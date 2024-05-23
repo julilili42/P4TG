@@ -15,31 +15,32 @@ import {
   formatFrameCount,
   calculateWeightedRTTs,
   calculateWeightedIATs,
-  getStreamIDsByPort,
   activePorts,
-  formatTime,
-} from "../../common/StatisticUtils";
+} from "../../common/utils/StatisticUtils";
 import {
   dummyText,
   createAutoTableConfig,
-  shouldDrawLine,
-  columnsT0,
-  columnsT1,
-  formatRowsT1,
-  columnsT2,
-  rowT2,
-  columnsT3,
-  rowT3,
-  columnsT7,
+  activePortsCols,
+  formatActivePortsRows,
+  activeStreamCols,
+  frameStatsRTTCols,
+  formatFrameStatsRTTRows,
+  frameEthernetCols,
+  frameEthernetRow,
+  frameSizeCountCols,
   frameTypes,
   frameSizes,
   modes,
-  encapsulation,
-  addDots,
   splitArrayIntoChunks,
-} from "../../common/PdfUtils";
-
-import { secondsToTime } from "../SendReceiveMonitor";
+  formatActiveStreamRows,
+  formatPortStreamCols,
+  formatPortStreamRows,
+  frameSizeCountRow,
+  createTableOfContents,
+  createTestExplanation,
+  addHeadersAndFooters,
+  addSubHeaders,
+} from "../../common/utils/PdfUtils";
 
 const DownloadPdfButton = React.memo(
   ({
@@ -141,21 +142,14 @@ const DownloadPdfButton = React.memo(
       return () => clearInterval(interval);
     }, [currentLanguage]);
 
-    const getPortAndChannelFromPid = (pid: number | string) => {
-      const numericPid = typeof pid === "string" ? parseInt(pid) : pid;
-      const pidData = ports.find((p) => p.pid === numericPid);
-      return pidData
-        ? { port: pidData.port, channel: pidData.channel }
-        : { port: "N/A", channel: "N/A" };
-    };
-
     const handleDownloadPdf = () => {
       const doc = new jsPDF("p", "mm", [297, 210]);
       doc.setFont("helvetica", "normal");
 
-      // Split the graph images into chunks of 6, starting with each port pair and ending with the summary graphs
+      // Split the graph images array into subarrays of size 6 (number of graphs per port pair), starting with each port pair and ending with the summary graphs
       const all_network_graphs = splitArrayIntoChunks(graph_images, 6);
 
+      // Create Array which holds all chapters
       const subHeaders = activePorts(port_mapping).flatMap((v) => [
         [`Overview ${v.tx} --> ${v.rx}`],
         [`Network Graphs ${v.tx} --> ${v.rx}`],
@@ -168,73 +162,27 @@ const DownloadPdfButton = React.memo(
       subHeaders.unshift([`Table of Contents`]);
 
       /* Table of Contents */
-      doc.setFontSize(12);
-      let currentPage = 1;
-
-      const startX = 15; // Start position for the text
-      const buffer = 2; // Buffer space on each side of the dots
-      const targetX = 180 - buffer; // Start position for the page number with buffer accounted
-
-      for (let i = 0; i < subHeaders.length; i++) {
-        // Skip Table of Contents in Table of Contents
-        if (i > 0) {
-          let yPosition = 40 + (i - 1) * 10;
-          let title = subHeaders[i][0];
-          let pageNumberText = "Seite " + (i + 1).toString();
-
-          // Add the title
-          doc.textWithLink(title, startX, yPosition, {
-            pageNumber: currentPage,
-          });
-
-          // Calculate and add the dots with buffer space
-          let textWidth = doc.getTextWidth(title);
-          let dots = addDots(doc, title, targetX, startX, buffer);
-          doc.text(dots, startX + textWidth + buffer, yPosition);
-
-          // Add the page number
-          doc.setFont("helvetica", "bold");
-          doc.textWithLink(pageNumberText, targetX + buffer, yPosition, {
-            pageNumber: currentPage,
-          });
-          doc.setFont("helvetica", "normal");
-        }
-        currentPage++;
-      }
+      createTableOfContents(doc, subHeaders);
 
       doc.addPage();
 
       /* Test explanation */
-      const splitTextToSize = doc.splitTextToSize(dummyText, 170);
-      doc.text(splitTextToSize, 20, 35);
+      createTestExplanation(doc, dummyText);
 
       doc.addPage();
 
-      const rowsT0 = [];
+      /* Stream Configuration */
 
-      for (const [txPid, rxPid] of Object.entries(port_mapping)) {
-        const txData = getPortAndChannelFromPid(txPid);
-        const rxData = getPortAndChannelFromPid(rxPid);
+      // Active Ports Table
 
-        rowsT0.push([
-          txData.port,
-          txData.channel,
-          txPid,
-          rxData.port,
-          rxData.channel,
-          rxPid,
-        ]);
-      }
+      const activePortsRows = formatActivePortsRows(port_mapping, ports);
 
-      /*
-        Port Mapping Table 
-      */
       autoTable(
         doc,
         createAutoTableConfig(
           doc,
-          columnsT0,
-          rowsT0,
+          activePortsCols,
+          activePortsRows,
           {
             0: { cellWidth: 30 },
             1: { cellWidth: 30 },
@@ -252,25 +200,16 @@ const DownloadPdfButton = React.memo(
         )
       );
 
-      const rowsT7 = streams.map((stream) => [
-        stream.app_id,
-        stream.frame_size + " bytes",
-        stream.traffic_rate + " Gbps",
-        stream.burst == 1 ? "IAT Precision" : "Rate Precision",
-        stream.vxlan,
-        encapsulation[stream.encapsulation],
-        stream.number_of_lse,
-      ]);
+      // Active Stream Table
 
-      /*
-        Stream Setting Table 1
-      */
+      const activeStreamRows = formatActiveStreamRows(streams);
+
       autoTable(
         doc,
         createAutoTableConfig(
           doc,
-          columnsT7,
-          rowsT7,
+          activeStreamCols,
+          activeStreamRows,
           {
             0: { cellWidth: 25 },
             1: { cellWidth: 25 },
@@ -288,38 +227,24 @@ const DownloadPdfButton = React.memo(
         )
       );
 
-      const columnsT8 = ["TX Port", "RX Port"].concat(
-        streams.map((stream) => `Stream ${stream.app_id}`)
+      // Port stream activation Table
+
+      const portStreamCols = formatPortStreamCols(streams);
+
+      const portStreamRows = formatPortStreamRows(
+        port_mapping,
+        ports,
+        stream_settings,
+        streams,
+        portStreamCols
       );
 
-      const rowsT8 = activePorts(port_mapping).map((stream) => {
-        const createArrayWithIndex = (
-          indices: number[],
-          arraySize: number
-        ): string[] =>
-          Array.from({ length: arraySize }, (_, i) =>
-            indices.includes(i + 1) ? "on" : "off"
-          );
-        return [
-          `${getPortAndChannelFromPid(stream.tx).port} (${stream.tx})`,
-          `${getPortAndChannelFromPid(stream.rx).port} (${stream.rx})`,
-        ].concat(
-          createArrayWithIndex(
-            getStreamIDsByPort(stream.tx, stream_settings, streams),
-            columnsT8.length - 2
-          )
-        );
-      });
-
-      /*
-        Stream Setting Table 2
-      */
       autoTable(
         doc,
         createAutoTableConfig(
           doc,
-          columnsT8,
-          rowsT8,
+          portStreamCols,
+          portStreamRows,
           { 0: { cellWidth: 25 }, 1: { cellWidth: 25 } },
           [0, 1, 2, 3, 4, 5, 6, 7, 8],
           {
@@ -332,7 +257,11 @@ const DownloadPdfButton = React.memo(
 
       doc.addPage();
 
-      const rowsT1 = formatRowsT1({
+      /* Summary Table */
+
+      // Packet statistics summary and RTT
+
+      const frameStatsRTTRows = formatFrameStatsRTTRows({
         lost_packets,
         total_rx,
         out_of_order_packets,
@@ -342,43 +271,30 @@ const DownloadPdfButton = React.memo(
         currentLanguage,
       });
 
-      /*
-      Summary Table
-      */
-      autoTable(doc, {
-        head: [columnsT1],
-        body: rowsT1,
-        theme: "plain",
-        startY: 35,
-        columnStyles: {
-          0: { cellWidth: 40 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 40 },
-          3: { cellWidth: 30 },
-        },
-        didDrawCell: (data) => {
-          if (
-            !(
-              (data.column.index == 3 || data.column.index == 4) &&
-              data.row.index > 3
-            )
-          ) {
-            if (shouldDrawLine(data.column.index, [0, 1, 3, 4])) {
-              doc.setDrawColor(0);
-              doc.setLineWidth(0.1);
-              doc.line(
-                data.cell.x,
-                data.cell.y + data.cell.height,
-                data.cell.x + data.cell.width,
-                data.cell.y + data.cell.height
-              );
-            }
-          }
-        },
-      });
+      autoTable(
+        doc,
+        createAutoTableConfig(
+          doc,
+          frameStatsRTTCols,
+          frameStatsRTTRows,
+          {
+            0: { cellWidth: 40 },
+            1: { cellWidth: 20 },
+            2: { cellWidth: 40 },
+            3: { cellWidth: 30 },
+          },
+          [0, 1, 3, 4],
+          {
+            startY: 35,
+          },
+          true
+        )
+      );
 
-      const rowsT2 = frameTypes.map((type) =>
-        rowT2(
+      // Frame and Ethernet Type Table
+
+      const frameEthernetRows = frameTypes.map((type) =>
+        frameEthernetRow(
           stats,
           port_mapping,
           type.label1 as string,
@@ -388,16 +304,12 @@ const DownloadPdfButton = React.memo(
         )
       );
 
-      /*
-      Frame and Ethernet Type Table
-      */
-
       autoTable(
         doc,
         createAutoTableConfig(
           doc,
-          columnsT2,
-          rowsT2,
+          frameEthernetCols,
+          frameEthernetRows,
           {
             0: { cellWidth: 30 },
             1: { cellWidth: 30 },
@@ -410,10 +322,12 @@ const DownloadPdfButton = React.memo(
         )
       );
 
-      const rowsT3 = [
+      // Frame Size Count Table
+
+      const frameSizeCountRows = [
         ...frameSizes.map(([label, low, high]) =>
           label != "Total"
-            ? rowT3(
+            ? frameSizeCountRow(
                 stats,
                 port_mapping,
                 label as string,
@@ -433,16 +347,13 @@ const DownloadPdfButton = React.memo(
               ]
         ),
       ];
-      /*
-      Frame Size Count Table 
-      */
 
       autoTable(
         doc,
         createAutoTableConfig(
           doc,
-          columnsT3,
-          rowsT3,
+          frameSizeCountCols,
+          frameSizeCountRows,
           {
             0: { cellWidth: 30 },
             1: { cellWidth: 30 },
@@ -456,7 +367,9 @@ const DownloadPdfButton = React.memo(
       );
 
       doc.addPage();
+
       /* Network Graphs Summary */
+
       // Last element of all_network_graphs is the summary graphs
       all_network_graphs[all_network_graphs.length - 1].forEach(
         (imageData, index) => {
@@ -473,6 +386,8 @@ const DownloadPdfButton = React.memo(
         }
       );
       doc.addPage();
+
+      /* Active ports report */
 
       activePorts(port_mapping).map((v, i, array) => {
         let mapping: { [name: number]: number } = { [v.tx]: v.rx };
@@ -502,7 +417,7 @@ const DownloadPdfButton = React.memo(
         const iats_rx = calculateWeightedIATs("rx", stats, mapping);
         const rtt = calculateWeightedRTTs(stats, mapping);
 
-        const rowsT4 = formatRowsT1({
+        const frameStatsRTTRows = formatFrameStatsRTTRows({
           lost_packets: lost_packets,
           total_rx: total_rx,
           out_of_order_packets: out_of_order_packets,
@@ -512,40 +427,28 @@ const DownloadPdfButton = React.memo(
           currentLanguage: currentLanguage,
         });
 
-        autoTable(doc, {
-          head: [columnsT1],
-          body: rowsT4,
-          theme: "plain",
-          startY: 35,
-          columnStyles: {
-            0: { cellWidth: 40 },
-            1: { cellWidth: 20 },
-            2: { cellWidth: 40 },
-            3: { cellWidth: 30 },
-          },
-          didDrawCell: (data) => {
-            if (
-              !(
-                (data.column.index == 3 || data.column.index == 4) &&
-                data.row.index > 3
-              )
-            ) {
-              if (shouldDrawLine(data.column.index, [0, 1, 3, 4])) {
-                doc.setDrawColor(0);
-                doc.setLineWidth(0.1);
-                doc.line(
-                  data.cell.x,
-                  data.cell.y + data.cell.height,
-                  data.cell.x + data.cell.width,
-                  data.cell.y + data.cell.height
-                );
-              }
-            }
-          },
-        });
+        autoTable(
+          doc,
+          createAutoTableConfig(
+            doc,
+            frameStatsRTTCols,
+            frameStatsRTTRows,
+            {
+              0: { cellWidth: 40 },
+              1: { cellWidth: 20 },
+              2: { cellWidth: 40 },
+              3: { cellWidth: 30 },
+            },
+            [0, 1, 3, 4],
+            {
+              startY: 35,
+            },
+            true
+          )
+        );
 
-        const rowsT5 = frameTypes.map((type) =>
-          rowT2(
+        const frameEthernetRows = frameTypes.map((type) =>
+          frameEthernetRow(
             stats,
             mapping,
             type.label1 as string,
@@ -559,8 +462,8 @@ const DownloadPdfButton = React.memo(
           doc,
           createAutoTableConfig(
             doc,
-            columnsT2,
-            rowsT5,
+            frameEthernetCols,
+            frameEthernetRows,
             {
               0: { cellWidth: 30 },
               1: { cellWidth: 30 },
@@ -569,19 +472,14 @@ const DownloadPdfButton = React.memo(
               4: { cellWidth: 30 },
               5: { cellWidth: 25 },
             },
-            [0, 1, 2, 4, 5, 6],
-            {
-              styles: {
-                halign: "center",
-              },
-            }
+            [0, 1, 2, 4, 5, 6]
           )
         );
 
-        const rowsT6 = [
+        const frameSizeCountRows = [
           ...frameSizes.map(([label, low, high]) =>
             label != "Total"
-              ? rowT3(
+              ? frameSizeCountRow(
                   stats,
                   mapping,
                   label as string,
@@ -606,8 +504,8 @@ const DownloadPdfButton = React.memo(
           doc,
           createAutoTableConfig(
             doc,
-            columnsT3,
-            rowsT6,
+            frameSizeCountCols,
+            frameSizeCountRows,
             {
               0: { cellWidth: 30 },
               1: { cellWidth: 30 },
@@ -616,14 +514,10 @@ const DownloadPdfButton = React.memo(
               4: { cellWidth: 30 },
               5: { cellWidth: 25 },
             },
-            [0, 1, 2, 4, 5, 6],
-            {
-              styles: {
-                halign: "center",
-              },
-            }
+            [0, 1, 2, 4, 5, 6]
           )
         );
+
         doc.addPage();
 
         all_network_graphs[i].forEach((imageData, index) => {
@@ -635,76 +529,33 @@ const DownloadPdfButton = React.memo(
             180,
             36,
             "",
-            "FAST"
+            "FAST" // Image Compression
           );
         });
 
-        // Don't add a new page if it's the last element
+        // Don't add a new page if it's the last page
         if (i < array.length - 1) {
           doc.addPage();
         }
       });
 
-      /* Add header and footer on every page */
-      var totalPages = doc.getNumberOfPages();
+      /* Add header and footer to every page */
+      addHeadersAndFooters(doc, elapsed_time);
+      addSubHeaders(doc, subHeaders);
 
-      for (let index = 1; index <= totalPages; index++) {
-        doc.setPage(index);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-
-        // Header
-        doc.text("Report was generated on: " + formatTime(), 5, 5, {
-          align: "left",
-        });
-        doc.text(
-          "Test duration: " + secondsToTime(elapsed_time),
-          pageWidth - 5,
-          5,
-          {
-            align: "right",
-          }
-        );
-
-        // Footer Page Number
-        doc.text(
-          "Page " + index + " of " + totalPages,
-          pageWidth - 5,
-          pageHeight - 5,
-          {
-            align: "right",
-          }
-        );
-
-        doc.setFontSize(17);
-        doc.setFont("helvetica", "bold");
-        doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
-        doc.setFont("helvetica", "normal");
-      }
-
-      currentPage = 1;
-
-      for (let i = 0; i < subHeaders.length; i++) {
-        doc.setPage(currentPage);
-        doc.setFontSize(12);
-
-        doc.text(subHeaders[i], 105, 25, { align: "center" });
-
-        currentPage++;
-      }
       doc.save("Network Report.pdf");
     };
 
     return (
-      <Button
-        onClick={handleDownloadPdf}
-        className="mb-1 w-100 "
-        variant="secondary"
-      >
-        <i className="bi bi-download" /> PDF Download
-      </Button>
+      <div style={{ position: "absolute", width: "100%" }}>
+        <Button
+          onClick={handleDownloadPdf}
+          className="mb-1 w-100"
+          variant="secondary"
+        >
+          <i className="bi bi-download" /> PDF Download
+        </Button>
+      </div>
     );
   }
 );

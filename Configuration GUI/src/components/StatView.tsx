@@ -39,8 +39,8 @@ import {
   calculateWeightedRTTs,
   calculateWeightedIATs,
   addRates,
-} from "../common/StatisticUtils";
-import translate from "../components/Translate";
+} from "../common/utils/StatisticUtils";
+import translate from "./translation/Translate";
 
 const Overline = styled.span`
   text-decoration: overline;
