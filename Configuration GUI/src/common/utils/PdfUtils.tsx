@@ -55,6 +55,7 @@ export const addDots = (
 export const createTableOfContents = (
   doc: jsPDF,
   subHeaders: string[][],
+  currentLanguage: string,
   startX = 15,
   buffer = 2
 ) => {
@@ -69,7 +70,8 @@ export const createTableOfContents = (
     if (i > 0) {
       let yPosition = 40 + (i - 1) * 10;
       let title = subHeaders[i][0];
-      let pageNumberText = "Seite " + (i + 1).toString();
+      let pageNumberText =
+        translate("Page", currentLanguage) + " " + (i + 1).toString();
 
       // Add the chapter title
       doc.textWithLink(title, startX, yPosition, {
@@ -103,7 +105,11 @@ export const createTestExplanation = (
   doc.text(splitTextToSize, startX, startY);
 };
 
-export const addHeadersAndFooters = (doc: jsPDF, elapsed_time: number) => {
+export const addHeadersAndFooters = (
+  doc: jsPDF,
+  elapsed_time: number,
+  currentLanguage: string
+) => {
   const totalPages = doc.getNumberOfPages();
 
   for (let index = 1; index <= totalPages; index++) {
@@ -114,11 +120,20 @@ export const addHeadersAndFooters = (doc: jsPDF, elapsed_time: number) => {
     const pageHeight = doc.internal.pageSize.getHeight();
 
     // Test duration and report generation time
-    doc.text("Report was generated on: " + formatTime(), 5, 5, {
-      align: "left",
-    });
     doc.text(
-      "Test duration: " + secondsToTime(elapsed_time),
+      translate("Report was generated on:", currentLanguage) +
+        " " +
+        formatTime(),
+      5,
+      5,
+      {
+        align: "left",
+      }
+    );
+    doc.text(
+      translate("Test duration:", currentLanguage) +
+        " " +
+        secondsToTime(elapsed_time),
       pageWidth - 5,
       5,
       {
@@ -128,7 +143,13 @@ export const addHeadersAndFooters = (doc: jsPDF, elapsed_time: number) => {
 
     // Footer Page Number
     doc.text(
-      "Page " + index + " of " + totalPages,
+      translate("Page", currentLanguage) +
+        " " +
+        index +
+        " " +
+        translate("of", currentLanguage) +
+        " " +
+        totalPages,
       pageWidth - 5,
       pageHeight - 5,
       {

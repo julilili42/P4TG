@@ -41,6 +41,7 @@ import {
   addHeadersAndFooters,
   addSubHeaders,
 } from "../../common/utils/PdfUtils";
+import translate from "../translation/Translate";
 
 const DownloadPdfButton = React.memo(
   ({
@@ -151,18 +152,26 @@ const DownloadPdfButton = React.memo(
 
       // Create Array which holds all chapters
       const subHeaders = activePorts(port_mapping).flatMap((v) => [
-        [`Overview ${v.tx} --> ${v.rx}`],
-        [`Network Graphs ${v.tx} --> ${v.rx}`],
+        [`${translate("Overview", currentLanguage)} ${v.tx} --> ${v.rx}`],
+        [`${translate("Network Graphs", currentLanguage)} ${v.tx} --> ${v.rx}`],
       ]);
 
-      subHeaders.unshift([`Network Graphs Summary`]);
-      subHeaders.unshift([`Summary`]);
-      subHeaders.unshift([`Stream Configuration in ${modes[mode]} mode`]);
-      subHeaders.unshift([`Test explanation`]);
-      subHeaders.unshift([`Table of Contents`]);
+      subHeaders.unshift([
+        `${translate("Network Graphs Summary", currentLanguage)}`,
+      ]);
+      subHeaders.unshift([`${translate("Summary", currentLanguage)}`]);
+      subHeaders.unshift([
+        `${translate("Stream Configuration in", currentLanguage)} ${
+          modes[mode]
+        } ${translate("mode", currentLanguage)}`,
+      ]);
+      subHeaders.unshift([`${translate("Test explanation", currentLanguage)}`]);
+      subHeaders.unshift([
+        `${translate("Table of Contents", currentLanguage)}`,
+      ]);
 
       /* Table of Contents */
-      createTableOfContents(doc, subHeaders);
+      createTableOfContents(doc, subHeaders, currentLanguage);
 
       doc.addPage();
 
@@ -540,7 +549,7 @@ const DownloadPdfButton = React.memo(
       });
 
       /* Add header and footer to every page */
-      addHeadersAndFooters(doc, elapsed_time);
+      addHeadersAndFooters(doc, elapsed_time, currentLanguage);
       addSubHeaders(doc, subHeaders);
 
       doc.save("Network Report.pdf");

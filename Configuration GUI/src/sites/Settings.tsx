@@ -54,7 +54,7 @@ export const StyledCol = styled.td`
 const Settings = ({
   onTestChange,
 }: {
-  onTestChange?: (event: any) => void;
+  onTestChange?: (duration: number) => void;
 }) => {
   const [ports, set_ports] = useState<
     {
@@ -272,7 +272,11 @@ const Settings = ({
   const [duration, setDuration] = useState(0);
 
   const handleInputChange = (event) => {
-    setDuration(event.target.value);
+    const value = event.target.value;
+    if (value === "") {
+      onTestChange(0);
+    }
+    setDuration(Number(value));
   };
 
   const handleDurationChange = (event: any) => {
@@ -286,9 +290,8 @@ const Settings = ({
   // @ts-ignore
   return (
     <Loader loaded={loaded}>
-      <Row>
+      <Row className="align-items-end">
         <Col className={"col-2"}>
-          <Form.Text className="text-muted">&nbsp;</Form.Text>{" "}
           <Form.Select
             disabled={running}
             required
@@ -331,54 +334,61 @@ const Settings = ({
             </option>
           </Form.Select>
         </Col>
-        <Col>
+        <Col className={"col-3"}>
           <Form onSubmit={handleDurationChange}>
             <Form.Text className="text-muted">
               {translate("Enter Test Duration", currentLanguage)}
             </Form.Text>
-            <Form.Group className="mb-3" controlId="numberInput">
-              <Form.Control
-                type="number"
-                min={0}
-                placeholder={translate("Number of seconds", currentLanguage)}
-                onChange={handleInputChange}
-                required
-              />
-            </Form.Group>
+            <Form.Control
+              type="number"
+              min={0}
+              placeholder={translate("Number of seconds", currentLanguage)}
+              onChange={handleInputChange}
+              required
+            />
           </Form>
         </Col>
         <Col>
           <InfoBox>
             <>
-              <p>P4TG supports multiple modes.</p>
+              <p>
+                {translate("P4TG supports multiple modes.", currentLanguage)}
+              </p>
 
-              <h5>Constant bit rate (CBR)</h5>
+              <h5>{translate("Constant bit rate", currentLanguage)} (CBR)</h5>
 
               <p>
-                Constant bit rate (CBR) traffic sends traffic with a constant
-                rate.
+                {translate(
+                  "Constant bit rate (CBR) traffic sends traffic with a constant rate.",
+                  currentLanguage
+                )}
               </p>
 
               <h5>Poisson</h5>
 
               <p>
-                Poisson traffic is traffic with random inter-arrival times but a
-                constant average traffic rate.
+                {translate(
+                  "Poisson traffic is traffic with random inter-arrival times but a constant average traffic rate.",
+                  currentLanguage
+                )}
               </p>
 
               <h5>Mpps</h5>
 
               <p>
-                In Mpps mode, P4TG generates traffic with a fixed number of
-                packets per seconds.
+                {translate(
+                  "In Mpps mode, P4TG generates traffic with a fixed number of packets per seconds.",
+                  currentLanguage
+                )}
               </p>
 
               <h5>Monitor/Analyze</h5>
 
               <p>
-                In monitor/analyze mode, P4TG forwards traffic received on its
-                ports and measures L1/L2 rates, packet sizes/types and
-                inter-arrival times.
+                {translate(
+                  "In monitor/analyze mode, P4TG forwards traffic received on its ports and measures L1/L2 rates, packet sizes/types and inter-arrival times.",
+                  currentLanguage
+                )}
               </p>
             </>
           </InfoBox>
