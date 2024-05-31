@@ -23,7 +23,6 @@ import { del, get, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
 import StatView from "../components/StatView";
 import Loader from "../components/Loader";
-import DownloadPdfButton from "../components/pdf/Pdf";
 
 import {
   Encapsulation,
@@ -39,6 +38,7 @@ import styled from "styled-components";
 import StreamView from "../components/StreamView";
 import translate from "../components/translation/Translate";
 import HiddenGraphs from "../components/pdf/HiddenVisuals";
+import Download from "../components/Download";
 
 styled(Row)`
   display: flex;
@@ -338,7 +338,8 @@ const Home = () => {
                         port_mapping={port_tx_rx_mapping}
                         onConvert={handleGraphConvert}
                       />
-                      <DownloadPdfButton
+                      <Download
+                        data={time_statistics}
                         stats={statistics}
                         port_mapping={port_tx_rx_mapping}
                         graph_images={imageData}
@@ -363,7 +364,6 @@ const Home = () => {
           label={translate("Visualization", currentLanguage)}
         />
       </Form>
-
       <Tabs defaultActiveKey="Summary" className="mt-3">
         <Tab eventKey="Summary" title={translate("Summary", currentLanguage)}>
           <StatView

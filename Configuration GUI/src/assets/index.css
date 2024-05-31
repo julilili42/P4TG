@@ -165,3 +165,9 @@ table tr th {
   width: 1000px;
   overflow: hidden;
 }
+
+.custom-dropdown-item:focus,
+.custom-dropdown-item.active {
+  background-color: #555c61; /* Custom background color for active and focus states */
+  color: #fff; /* Custom text color for active and focus states */
+}

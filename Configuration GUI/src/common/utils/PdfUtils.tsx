@@ -359,7 +359,7 @@ export const frameEthernetRow = (
             get_frame_types(stats, mapping, label1.toLowerCase())["rx"]
           ),
         ]
-      : ["0", "0"];
+      : ["", ""];
   }
 
   const frameData2 = label2

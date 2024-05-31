@@ -2,7 +2,7 @@ import { secondsToTime } from "../../components/SendReceiveMonitor";
 import { TimeStatistics, Statistics } from "../Interfaces";
 import { get_frame_stats, get_frame_types, get_rtt } from "./StatisticUtils";
 
-const generateLineData = (
+export const generateLineData = (
   data_key: string,
   use_key: boolean,
   data: TimeStatistics,
