@@ -131,7 +131,6 @@ const App = () => {
                       <Route path={"/home"} element={<Home />} />
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
-                      <Route path={"/settings"} element={<Settings />} />
                       <Route path={"/tests"} element={<TestSettings />} />
                     </Routes>
                   ) : (

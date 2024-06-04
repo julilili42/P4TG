@@ -53,8 +53,10 @@ export const StyledCol = styled.td`
 
 const Settings = ({
   onTestChange,
+  showDuration,
 }: {
   onTestChange?: (duration: number) => void;
+  showDuration?: boolean;
 }) => {
   const [ports, set_ports] = useState<
     {
@@ -290,7 +292,7 @@ const Settings = ({
   // @ts-ignore
   return (
     <Loader loaded={loaded}>
-      <Row className="align-items-end">
+      <Row className="align-items-center">
         <Col className={"col-2"}>
           <Form.Select
             disabled={running}
@@ -334,20 +336,24 @@ const Settings = ({
             </option>
           </Form.Select>
         </Col>
-        <Col className={"col-3"}>
-          <Form onSubmit={handleDurationChange}>
-            <Form.Text className="text-muted">
-              {translate("Enter Test Duration", currentLanguage)}
-            </Form.Text>
-            <Form.Control
-              type="number"
-              min={0}
-              placeholder={translate("Number of seconds", currentLanguage)}
-              onChange={handleInputChange}
-              required
-            />
-          </Form>
-        </Col>
+        {showDuration ? (
+          <Col className={"col-3"}>
+            <Form onSubmit={handleDurationChange}>
+              <Form.Text className="text-muted">
+                {translate("Enter Test Duration", currentLanguage)}
+              </Form.Text>
+              <Form.Control
+                type="number"
+                min={0}
+                placeholder={translate("Number of seconds", currentLanguage)}
+                onChange={handleInputChange}
+                required
+              />
+            </Form>
+          </Col>
+        ) : (
+          <></>
+        )}
         <Col>
           <InfoBox>
             <>

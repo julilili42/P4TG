@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Tab, Tabs } from "react-bootstrap";
+import { Button, Col, Row, Tab, Tabs, Form } from "react-bootstrap";
 import Settings from "../sites/Settings";
 import translate from "./translation/Translate";
 
@@ -20,6 +20,7 @@ const TestSettings = () => {
         <div style={{ marginTop: "15px" }}>
           <Settings
             onTestChange={(duration) => handleDurationChange(duration, "home")}
+            showDuration={true}
           />
         </div>
       ),
@@ -37,6 +38,7 @@ const TestSettings = () => {
 
   const [key, setKey] = useState("home");
   const [totalDuration, setTotalDuration] = useState(0);
+  const [currentMode, setCurrentMode] = useState(0);
 
   useEffect(() => {
     let total = 0;
@@ -81,6 +83,11 @@ const TestSettings = () => {
         tab.eventKey === eventKey ? { ...tab, duration: duration } : tab
       )
     );
+  };
+
+  const handleModeChange = (event: any) => {
+    const value = Number(event.target.value);
+    setCurrentMode(value);
   };
 
   const handleTitleChange = (eventKey: string, newTitle: string) => {
@@ -159,96 +166,113 @@ const TestSettings = () => {
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "start",
-          marginBottom: "30px",
-        }}
+      <Row
+        className="align-items-end justify-content-between"
+        style={{ marginBottom: "30px" }}
       >
-        <div>
-          <Button variant="secondary" disabled={true}>
-            <i className="bi bi-clock-history" />{" "}
-            {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
-            {translate("seconds", currentLanguage)}
-          </Button>
-        </div>
-      </div>
-      <Tabs
-        onSelect={(k: string | null) => {
-          if (k === "add") {
-            addTab();
-          } else if (k) {
-            setKey(k);
-          }
-        }}
-        activeKey={key}
-      >
-        {tabs.map((tab) => (
-          <Tab
-            eventKey={tab.eventKey}
-            title={
-              tab.eventKey !== "add" ? (
-                <div className="d-flex align-items-center">
-                  {tab.titleEditable ? (
-                    <input
-                      type="text"
-                      value={tab.title}
-                      onChange={(e) =>
-                        handleTitleChange(tab.eventKey, e.target.value)
-                      }
-                      onBlur={() => toggleTitleEdit(tab.eventKey)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          toggleTitleEdit(tab.eventKey);
-                        }
-                      }}
-                      autoFocus
-                    />
-                  ) : (
-                    <span
-                      onDoubleClick={() => toggleTitleEdit(tab.eventKey)}
-                      style={{
-                        color: "inherit",
-                        textAlign: "inherit",
-                        flexGrow: "inherit",
-                        display: "inline",
-                        opacity: "1",
-                      }}
-                    >
-                      {tab.duration === 0 ? (
-                        <div>
-                          <i className="bi bi-exclamation-triangle"></i>{" "}
-                          {tab.title}{" "}
-                        </div>
-                      ) : (
-                        tab.title
-                      )}
-                    </span>
-                  )}
-
-                  {tab.eventKey !== "home" ? (
-                    <button
-                      className="outline-none border-0 bg-transparent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteTab(tab.eventKey);
-                      }}
-                    >
-                      <i className="bi bi-x"></i>
-                    </button>
-                  ) : (
-                    <></>
-                  )}
-                </div>
-              ) : // prettier-ignore
-              tab.duration === 0 && tab.eventKey !== "add" ? (<div><i className="bi bi-exclamation-triangle"></i> {tab.title} </div>) : (tab.title)
-            }
+        <Col className={"col-2"}>
+          <Form.Text className="text-muted">
+            {translate("Test mode", currentLanguage)}
+          </Form.Text>
+          <Form.Select value={currentMode} onChange={handleModeChange}>
+            <option value={0}>Standard</option>
+            <option value={1}>Automatic tests</option>
+          </Form.Select>
+        </Col>
+        {currentMode === 1 ? (
+          <Col
+            className={"col-3"}
+            style={{ display: "flex", justifyContent: "right" }}
           >
-            {tab.content}
-          </Tab>
-        ))}
-      </Tabs>
+            <Button variant="secondary" disabled={true}>
+              <i className="bi bi-clock-history" />{" "}
+              {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
+              {translate("seconds", currentLanguage)}
+            </Button>
+          </Col>
+        ) : (
+          <></>
+        )}
+      </Row>
+      {currentMode === 1 ? (
+        <Tabs
+          onSelect={(k: string | null) => {
+            if (k === "add") {
+              addTab();
+            } else if (k) {
+              setKey(k);
+            }
+          }}
+          activeKey={key}
+        >
+          {tabs.map((tab) => (
+            <Tab
+              eventKey={tab.eventKey}
+              title={
+                tab.eventKey !== "add" ? (
+                  <div className="d-flex align-items-center">
+                    {tab.titleEditable ? (
+                      <input
+                        type="text"
+                        value={tab.title}
+                        onChange={(e) =>
+                          handleTitleChange(tab.eventKey, e.target.value)
+                        }
+                        onBlur={() => toggleTitleEdit(tab.eventKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            toggleTitleEdit(tab.eventKey);
+                          }
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() => toggleTitleEdit(tab.eventKey)}
+                        style={{
+                          color: "inherit",
+                          textAlign: "inherit",
+                          flexGrow: "inherit",
+                          display: "inline",
+                          opacity: "1",
+                        }}
+                      >
+                        {tab.duration === 0 ? (
+                          <div>
+                            <i className="bi bi-exclamation-triangle"></i>{" "}
+                            {tab.title}{" "}
+                          </div>
+                        ) : (
+                          tab.title
+                        )}
+                      </span>
+                    )}
+
+                    {tab.eventKey !== "home" ? (
+                      <button
+                        className="outline-none border-0 bg-transparent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTab(tab.eventKey);
+                        }}
+                      >
+                        <i className="bi bi-x"></i>
+                      </button>
+                    ) : (
+                      <></>
+                    )}
+                  </div>
+                ) : // prettier-ignore
+                tab.duration === 0 && tab.eventKey !== "add" ? (<div><i className="bi bi-exclamation-triangle"></i> {tab.title} </div>) : (tab.title)
+              }
+            >
+              {tab.content}
+            </Tab>
+          ))}
+        </Tabs>
+      ) : (
+        <Settings showDuration={false} />
+      )}
     </>
   );
 };
