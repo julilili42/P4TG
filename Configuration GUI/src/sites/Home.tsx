@@ -213,6 +213,13 @@ const Home = () => {
         if (mode != GenerationMode.MPPS && overall_rate > 100) {
           alert("Sum of stream rates > 100 Gbps!");
         } else {
+          /*           const trafficGenData: TrafficGenData = {
+            streams: streams,
+            stream_settings: stream_settings,
+            port_tx_rx_mapping: [port_tx_rx_mapping],
+            mode: mode,
+          }; */
+
           await post({
             route: "/trafficgen",
             body: {
@@ -228,6 +235,34 @@ const Home = () => {
       }
     }
     set_overlay(false);
+  };
+
+  const onTest = async () => {
+    const traffic_generations = [
+      {
+        streams: streams,
+        stream_settings: stream_settings,
+        port_tx_rx_mapping: port_tx_rx_mapping,
+        mode: mode,
+      },
+      {
+        streams: streams,
+        stream_settings: stream_settings,
+        port_tx_rx_mapping: port_tx_rx_mapping,
+        mode: mode,
+      },
+    ];
+
+    const durations = [10, 20];
+
+    let msg = await post({
+      route: "/multiple_trafficgen",
+      body: {
+        traffic_generations: traffic_generations,
+        durations: durations,
+      },
+    });
+    console.log(msg);
   };
 
   const loadStatistics = async () => {
@@ -318,6 +353,9 @@ const Home = () => {
                   <div>
                     <Button type={"submit"} className="mb-1" variant="primary">
                       <i className="bi bi-play-circle-fill" /> Start{" "}
+                    </Button>{" "}
+                    <Button onClick={onTest} className="mb-1" variant="primary">
+                      <i className="bi bi-play-circle-fill" /> Test{" "}
                     </Button>{" "}
                     <Button
                       onClick={() => {

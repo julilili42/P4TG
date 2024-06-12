@@ -31,7 +31,7 @@ use crate::core::statistics::{IATStatistics, IATValues, RangeCount, RTTStatistic
 
 use crate::api::{docs, helper};
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, Deserialize, Clone, ToSchema)]
 pub struct Statistics {
     /// Indicates whether the sample mode is used or not.
     /// In sampling mode, IATs are sampled and not calculated in the data plane.

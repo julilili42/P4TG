@@ -119,6 +119,7 @@ const TestSettings = () => {
             onTestChange={(duration) =>
               handleDurationChange(duration, newTabKey)
             }
+            showDuration={true}
           />
         </div>
       ),

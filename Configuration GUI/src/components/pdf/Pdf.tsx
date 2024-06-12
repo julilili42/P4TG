@@ -39,6 +39,7 @@ import {
   createTestExplanation,
   addHeadersAndFooters,
   addSubHeaders,
+  getPortAndChannelFromPid,
 } from "../../common/utils/PdfUtils";
 import translate from "../translation/Translate";
 
@@ -150,8 +151,16 @@ const DownloadPdf = ({
 
     // Create Array which holds all chapters
     const subHeaders = activePorts(port_mapping).flatMap((v) => [
-      [`${translate("Overview", currentLanguage)} ${v.tx} --> ${v.rx}`],
-      [`${translate("Network Graphs", currentLanguage)} ${v.tx} --> ${v.rx}`],
+      [
+        `${translate("Overview", currentLanguage)} ${v.tx} (${
+          getPortAndChannelFromPid(v.tx, ports).port
+        }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`,
+      ],
+      [
+        `${translate("Network Graphs", currentLanguage)} ${v.tx} (${
+          getPortAndChannelFromPid(v.tx, ports).port
+        }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`,
+      ],
     ]);
 
     subHeaders.unshift([

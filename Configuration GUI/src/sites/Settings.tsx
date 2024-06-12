@@ -292,7 +292,7 @@ const Settings = ({
   // @ts-ignore
   return (
     <Loader loaded={loaded}>
-      <Row className="align-items-center">
+      <Row className="align-items-end">
         <Col className={"col-2"}>
           <Form.Select
             disabled={running}

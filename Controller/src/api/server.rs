@@ -31,7 +31,7 @@ use utoipa::{openapi::security::{ApiKey, ApiKeyValue, SecurityScheme}, Modify, O
 use utoipa_swagger_ui::SwaggerUi;
 
 use tower_http::cors::{Any, CorsLayer};
-use crate::api::{configure_traffic_gen, online, ports, reset, statistics, stop_traffic_gen, traffic_gen, restart, add_port, config};
+use crate::api::{add_port, config, configure_traffic_gen, online, ports, reset, restart, statistics, stop_traffic_gen, traffic_gen, configure_multiple_traffic_gen, get_collected_statistics};
 
 
 use crate::api::helper::serve_static_files::{serve_index, static_path};
@@ -42,6 +42,7 @@ use crate::AppState;
 use crate::api::tables;
 
 use crate::core::traffic_gen_core::types::*;
+
 
 #[derive(OpenApi)]
 #[openapi(
@@ -143,6 +144,7 @@ pub async fn start_api_server(state: Arc<AppState>) {
         .route("/ports/arp", post(arp_reply))
         .route("/tables", get(tables))
         .route("/config", get(config))
+        .route("/multiple_trafficgen", get(get_collected_statistics).post(configure_multiple_traffic_gen))
         .layer(cors)
         .with_state(Arc::clone(&state));
 

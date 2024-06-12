@@ -18,7 +18,7 @@
  */
 
 use std::collections::{BTreeMap, HashMap};
-use serde::{Serialize};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Serialize, Clone, ToSchema)]
@@ -26,7 +26,7 @@ pub struct FrameSizeStatistics {
     pub(crate) frame_size: HashMap<u32, RangeCount>
 }
 
-#[derive(Serialize, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Clone, ToSchema)]
 pub struct RangeCount {
     // lower, upper, count
     pub(crate) tx: Vec<RangeCountValue>,
@@ -41,7 +41,7 @@ impl RangeCount {
 
 /// Stores the number of packets that have been received with frame size
 /// in a given range
-#[derive(Serialize, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Clone, ToSchema)]
 pub struct RangeCountValue {
     /// lower bound on the frame size
     pub(crate) low: u32,
@@ -70,7 +70,7 @@ pub struct FrameTypeStatistics {
 
 
 /// Stores the number of packet types that have been sent / received.
-#[derive(Serialize, Debug, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct TypeCount {
     /// TX path
     pub(crate) tx: HashMap<String, u128>,
@@ -117,7 +117,7 @@ impl RateMonitorStatistics {
     }
 }
 
-#[derive(Serialize, Debug, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct IATStatistics {
     /// TX path
     pub(crate) tx: IATValues,
@@ -125,7 +125,7 @@ pub struct IATStatistics {
     pub(crate) rx: IATValues
 }
 
-#[derive(Serialize, Debug, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct RTTStatistics {
     pub(crate) mean: f64,
     pub(crate) min: u32,
@@ -141,7 +141,7 @@ impl IATStatistics {
     }
 }
 
-#[derive(Serialize, Debug, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct IATValues {
     /// Mean value. Either based on samples or computed in the data plane.
     /// See sample mode.

@@ -20,7 +20,7 @@ const encapsulation: { [key: number]: string } = {
   3: "MPLS (+4 byte / LSE)",
 };
 
-const getPortAndChannelFromPid = (
+export const getPortAndChannelFromPid = (
   pid: number | string,
   ports: {
     pid: number;

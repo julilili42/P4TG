@@ -22,6 +22,7 @@ use std::net::Ipv4Addr;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use utoipa::ToSchema;
+use crate::api::statistics::Statistics;
 
 /// Describes the supported encapsulations of P4TG.
 /// Currently, only MPLS, VLAN and QinQ are supported.
@@ -246,4 +247,11 @@ pub struct EmptyResponse {
 #[derive(Serialize, ToSchema)]
 pub struct Reset {
     pub(crate) message: String
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TestResult {
+    pub test_number: usize,
+    pub duration: u64,
+    pub statistics: Statistics,
 }
