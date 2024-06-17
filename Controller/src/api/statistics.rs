@@ -182,7 +182,7 @@ pub async fn statistics(State(state): State<Arc<AppState>>) -> Response {
     (StatusCode::OK, Json(stats)).into_response()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct Params {
     limit: Option<usize>,
 }

@@ -18,14 +18,13 @@
  */
 
 use std::sync::Arc;
-use std::time::SystemTime;
 use axum::debug_handler;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json, Response};
 use log::info;
 use serde::Serialize;
-use crate::api::helper::validate::validate_request;
+use crate::api::multiple_traffic_gen::configure_multiple_traffic_gen;
 
 use crate::api::server::Error;
 use crate::AppState;
@@ -67,8 +66,6 @@ pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
     }
 }
 
-
-
 /// Represents the result of a stream optimization.
 #[derive(Serialize)]
 pub struct Result {
@@ -84,6 +81,7 @@ pub struct Result {
 
 /// Method called on POST /trafficgen
 /// Starts the traffic generation with the specified settings in the POST body
+/// Calls the `configure_multiple_traffic_gen` method, by creating a list with a single TrafficGenData element
 #[debug_handler]
 #[utoipa::path(
     post,
@@ -105,54 +103,14 @@ pub struct Result {
     )
 )]
 pub async fn configure_traffic_gen(State(state): State<Arc<AppState>>, payload: Json<TrafficGenData>) -> Response {
-    let tg = &mut state.traffic_generator.lock().await;
+    let tg_list = MultipleTrafficGen {
+        traffic_generations: vec![payload.0],
+        durations: vec![None], // no duration limit
+    };
 
-    // contains the description of the stream, i.e., packet size and rate
-    // only look at active stream settings
-    let active_stream_settings: Vec<StreamSetting> = payload.stream_settings.clone().into_iter().filter(|s| s.active).collect();
-    let active_stream_ids: Vec<u8> = active_stream_settings.iter().map(|s| s.stream_id).collect();
-    let active_streams: Vec<Stream> = payload.streams.clone().into_iter().filter(|s| active_stream_ids.contains(&s.stream_id)).collect();
-
-    // Poisson traffic is only allowed to have a single stream
-    if payload.mode == GenerationMode::Poisson && active_streams.len() != 1 {
-        return (StatusCode::BAD_REQUEST, Json(Error::new("Poisson generation mode only allows for one stream."))).into_response()
-    }
-
-    // no streams should be generated in monitor/analyze mode
-    if payload.mode == GenerationMode::Analyze && !active_streams.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(Error::new("No stream definition in analyze mode allowed."))).into_response();
-    }
-
-    // contains the mapping of Send->Receive ports
-    // required for analyze mode
-    let port_mapping = &payload.port_tx_rx_mapping;
-
-    // validate request
-    match validate_request(&active_streams, &active_stream_settings, &payload.mode) {
-        Ok(_) => {},
-        Err(e) => return (StatusCode::BAD_REQUEST, Json(e)).into_response()
-    }
-
-    match tg.start_traffic_generation(&state, active_streams, payload.mode, active_stream_settings, port_mapping).await {
-        Ok(streams) => {
-            // store the settings for synchronization between multiple
-            // GUI clients
-            tg.port_mapping = payload.port_tx_rx_mapping.clone();
-            tg.stream_settings = payload.stream_settings.clone();
-            tg.streams = payload.streams.clone();
-            tg.mode = payload.mode;
-
-            // experiment starts now
-            // these values are used to show how long the experiment is running at the GUI
-            state.experiment.lock().await.start = SystemTime::now();
-            state.experiment.lock().await.running = true;
-
-            info!("Traffic generation started.");
-            (StatusCode::OK, Json(streams)).into_response()
-        }
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("{:#?}", err)))).into_response()
-    }
+    configure_multiple_traffic_gen(State(state), Json(tg_list)).await
 }
+
 
 #[utoipa::path(
     delete,

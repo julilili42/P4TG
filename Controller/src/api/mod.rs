@@ -31,7 +31,12 @@ mod config;
 mod docs;
 
 mod multiple_traffic_gen;
-pub use multiple_traffic_gen::{configure_multiple_traffic_gen, get_collected_statistics};
+pub use multiple_traffic_gen::configure_multiple_traffic_gen;
+pub use multiple_traffic_gen::multiple_traffic_gen;
+
+mod multiple_statistics;
+pub use multiple_statistics::multiple_statistics;
+pub use multiple_statistics::multiple_time_statistics;
 
 pub use online::online;
 pub use statistics::statistics;

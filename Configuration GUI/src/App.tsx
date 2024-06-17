@@ -25,6 +25,7 @@ import { AxiosInterceptor } from "./common/API";
 import styled from "styled-components";
 import ErrorView from "./components/ErrorView";
 import Navbar from "./components/Navbar";
+import Test from "./components/Test";
 
 import Home, { GitHub } from "./sites/Home";
 import Setup from "./sites/Setup";
@@ -132,6 +133,7 @@ const App = () => {
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
                       <Route path={"/tests"} element={<TestSettings />} />
+                      <Route path={"/testoutput"} element={<Test />} />
                     </Routes>
                   ) : (
                     <Offline />

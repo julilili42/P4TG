@@ -3,7 +3,9 @@ import {
   StreamSettings,
   Stream,
   TimeStatistics,
+  Encapsulation,
 } from "../Interfaces";
+
 export const get_frame_types = (
   stats: Statistics,
   port_mapping: { [name: number]: number },
@@ -351,4 +353,32 @@ export const formatTime = (): string => {
     ":" +
     LeadingZero(date.getSeconds());
   return showDate + " " + showTime;
+};
+
+export const getStreamFrameSize = (
+  streams: Stream[],
+  stream_id: number
+): number => {
+  let ret = 0;
+
+  streams.forEach((v) => {
+    if (v.app_id == stream_id) {
+      ret = v.frame_size;
+      if (v.encapsulation == Encapsulation.Q) {
+        ret += 4;
+      } else if (v.encapsulation == Encapsulation.QinQ) {
+        ret += 8;
+      } else if (v.encapsulation == Encapsulation.MPLS) {
+        ret += v.number_of_lse * 4; // 4 bytes per LSE
+      }
+
+      if (v.vxlan) {
+        ret += 50; // 50 bytes overhead
+      }
+
+      return;
+    }
+  });
+
+  return ret;
 };

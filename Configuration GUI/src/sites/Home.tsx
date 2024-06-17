@@ -213,13 +213,6 @@ const Home = () => {
         if (mode != GenerationMode.MPPS && overall_rate > 100) {
           alert("Sum of stream rates > 100 Gbps!");
         } else {
-          /*           const trafficGenData: TrafficGenData = {
-            streams: streams,
-            stream_settings: stream_settings,
-            port_tx_rx_mapping: [port_tx_rx_mapping],
-            mode: mode,
-          }; */
-
           await post({
             route: "/trafficgen",
             body: {
@@ -237,6 +230,7 @@ const Home = () => {
     set_overlay(false);
   };
 
+  // Multiple traffic generation POST request
   const onTest = async () => {
     const traffic_generations = [
       {
@@ -253,7 +247,7 @@ const Home = () => {
       },
     ];
 
-    const durations = [10, 20];
+    const durations = [10, 10];
 
     let msg = await post({
       route: "/multiple_trafficgen",

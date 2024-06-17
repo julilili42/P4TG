@@ -169,7 +169,7 @@ impl IATValues {
 
 /// Represents the time-based statistics
 /// for visualisation
-#[derive(Serialize, Debug, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct TimeStatistic {
     pub(crate) tx_rate_l1: BTreeMap<u32, BTreeMap<u32, f64>>,
     pub(crate) rx_rate_l1: BTreeMap<u32, BTreeMap<u32, f64>>,

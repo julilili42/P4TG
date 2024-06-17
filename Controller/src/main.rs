@@ -21,14 +21,13 @@ use std::env;
 use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
-use rbfrt::{SwitchConnection};
+use rbfrt::SwitchConnection;
 use log::{info, warn};
 use macaddr::MacAddr;
 use rbfrt::error::RBFRTError;
 use rbfrt::util::port_manager::{AutoNegotiation, FEC, Loopback, Port, Speed};
 use rbfrt::util::PortManager;
 use tokio::sync::Mutex;
-use crate::core::traffic_gen_core::types::TestResult;
 
 mod core;
 mod api;
@@ -37,6 +36,7 @@ mod error;
 use core::FrameSizeMonitor;
 use crate::core::{Arp, Config, FrameTypeMonitor, RateMonitor, TrafficGen};
 use crate::core::traffic_gen_core::event::TrafficGenEvent;
+use crate::core::traffic_gen_core::types::{MultipleStatistics, MultipleTimeStatistics, MultipleTrafficGen};
 
 #[derive(Debug, Copy, Clone)]
 pub struct PortMapping {
@@ -64,7 +64,11 @@ pub struct AppState {
     pub(crate) sample_mode: bool,
     pub(crate) config: Mutex<Config>,
     pub(crate) arp_handler: Arp,
-    pub(crate) collected_statistics: Mutex<Vec<TestResult>>,
+    
+    // Added for multiple traffic generators
+    pub(crate) collected_statistics: Mutex<Vec<MultipleStatistics>>,
+    pub(crate) collected_time_statistics: Mutex<Vec<MultipleTimeStatistics>>, 
+    pub(crate) multiple_traffic_generators: Mutex<Vec<MultipleTrafficGen>>,
 }
 
 async fn configure_ports(switch: &mut SwitchConnection, pm: &PortManager, config: &Config, recirculation_ports: &Vec<u32>, port_mapping: &mut HashMap<u32, PortMapping>) -> Result<(), RBFRTError> {
@@ -218,7 +222,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         experiment: Mutex::new(Experiment { start: std::time::SystemTime::now(), running: false }),
         config: Mutex::new(config),
         arp_handler,
-        collected_statistics: Mutex::new(Vec::new())
+        collected_statistics: Mutex::new(Vec::new()),
+        collected_time_statistics: Mutex::new(Vec::new()),
+        multiple_traffic_generators: Mutex::new(Vec::new()),
     });
 
     state.frame_size_monitor.lock().await.configure(&state.switch).await?;
