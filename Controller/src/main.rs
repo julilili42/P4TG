@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+use core::statistics::TimeStatistic;
+use core::traffic_gen_core::types::TrafficGenData;
 /*
  * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
  */
@@ -21,6 +23,7 @@ use std::env;
 use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
+use api::statistics::Statistics;
 use rbfrt::SwitchConnection;
 use log::{info, warn};
 use macaddr::MacAddr;
@@ -36,7 +39,6 @@ mod error;
 use core::FrameSizeMonitor;
 use crate::core::{Arp, Config, FrameTypeMonitor, RateMonitor, TrafficGen};
 use crate::core::traffic_gen_core::event::TrafficGenEvent;
-use crate::core::traffic_gen_core::types::{MultipleStatistics, MultipleTimeStatistics, MultipleTrafficGen};
 
 #[derive(Debug, Copy, Clone)]
 pub struct PortMapping {
@@ -64,11 +66,10 @@ pub struct AppState {
     pub(crate) sample_mode: bool,
     pub(crate) config: Mutex<Config>,
     pub(crate) arp_handler: Arp,
-    
     // Added for multiple traffic generators
-    pub(crate) collected_statistics: Mutex<Vec<MultipleStatistics>>,
-    pub(crate) collected_time_statistics: Mutex<Vec<MultipleTimeStatistics>>, 
-    pub(crate) multiple_traffic_generators: Mutex<Vec<MultipleTrafficGen>>,
+    pub(crate) collected_statistics: Mutex<Vec<Statistics>>,
+    pub(crate) collected_time_statistics: Mutex<Vec<TimeStatistic>>, 
+    pub(crate) multiple_traffic_generators: Mutex<Vec<TrafficGenData>>,
 }
 
 async fn configure_ports(switch: &mut SwitchConnection, pm: &PortManager, config: &Config, recirculation_ports: &Vec<u32>, port_mapping: &mut HashMap<u32, PortMapping>) -> Result<(), RBFRTError> {

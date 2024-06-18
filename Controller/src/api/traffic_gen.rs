@@ -59,7 +59,8 @@ pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
             mode: tg.mode,
             stream_settings: tg.stream_settings.clone(),
             streams: tg.streams.clone(),
-            port_tx_rx_mapping: tg.port_mapping.clone()
+            port_tx_rx_mapping: tg.port_mapping.clone(),
+            duration: None,
         };
 
         (StatusCode::OK, Json(tg_data)).into_response()
@@ -103,12 +104,7 @@ pub struct Result {
     )
 )]
 pub async fn configure_traffic_gen(State(state): State<Arc<AppState>>, payload: Json<TrafficGenData>) -> Response {
-    let tg_list = MultipleTrafficGen {
-        traffic_generations: vec![payload.0],
-        durations: vec![None], // no duration limit
-    };
-
-    configure_multiple_traffic_gen(State(state), Json(tg_list)).await
+    configure_multiple_traffic_gen(State(state), Json(vec![payload.0])).await
 }
 
 
@@ -127,9 +123,11 @@ pub async fn stop_traffic_gen(State(state): State<Arc<AppState>>) -> Response {
     match tg.lock().await.stop(switch).await {
         Ok(_) => {
             info!("Traffic generation stopped.");
-            state.experiment.lock().await.running = false;
+            state.experiment.lock().await.running = false;            
             StatusCode::OK.into_response()
         }
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("{:#?}", err)))).into_response()
     }
 }
+
+

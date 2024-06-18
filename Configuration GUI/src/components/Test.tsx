@@ -1,20 +1,10 @@
 import { useState, useEffect } from "react";
 import { get } from "../common/API";
-import {
-  Alert,
-  DropdownButton,
-  Dropdown,
-  Row,
-  Col,
-  Tabs,
-  Tab,
-} from "react-bootstrap";
+import { Alert, Row, Col, Tabs, Tab } from "react-bootstrap";
 import {
   Statistics as StatInterface,
   TimeStatistics,
-  Stream,
-  StreamSettings,
-  GenerationMode,
+  TrafficGenData,
 } from "../common/Interfaces";
 import StatView from "./StatView";
 import translate from "./translation/Translate";
@@ -25,50 +15,23 @@ import {
 } from "../common/utils/StatisticUtils";
 import StreamView from "./StreamView";
 
-export interface TrafficGenData {
-  mode: GenerationMode;
-  streams: Stream[];
-  stream_settings: StreamSettings[];
-  port_tx_rx_mapping: { [name: number]: number };
-}
-
-interface MultipleStatistics {
-  test_number: number;
-  completed: boolean;
-  duration: number;
-  statistics: StatInterface;
-}
-
-interface MultipleTimeStatistics {
-  test_number: number;
-  completed: boolean;
-  duration: number;
-  time_statistics: TimeStatistics;
-}
-
-interface MultipleTrafficGen {
-  traffic_generations: TrafficGenData[];
-  durations: number[];
-}
-
 const Test = () => {
-  const [multipleStatistics, setMultipleStatistics] = useState<
-    MultipleStatistics[]
-  >([]);
-  const [multipleTimeStatistics, setMultipleTimeStatistics] = useState<
-    MultipleTimeStatistics[]
-  >([]);
-  const [trafficGenData, setTrafficGenData] =
-    useState<MultipleTrafficGen | null>(null);
+  const [statistics, setStatistics] = useState<StatInterface | null>(null);
+  const [timeStatistics, setTimeStatistics] = useState<TimeStatistics | null>(
+    null
+  );
+  const [trafficGenData, setTrafficGenData] = useState<TrafficGenData[] | null>(
+    null
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [currentTest, setCurrentTest] = useState<number | null>(null);
   const [selectedTest, setSelectedTest] = useState<{
-    multipleStatistics: MultipleStatistics | null;
-    multipleTimeStatistics: MultipleTimeStatistics | null;
+    statistics: StatInterface | null;
+    timeStatistics: TimeStatistics | null;
     trafficGen: TrafficGenData | null;
   }>({
-    multipleStatistics: null,
-    multipleTimeStatistics: null,
+    statistics: null,
+    timeStatistics: null,
     trafficGen: null,
   });
 
@@ -76,8 +39,8 @@ const Test = () => {
     try {
       const [responseStatistics, responseTimeStatistics, responseTrafficGen] =
         await Promise.all([
-          get({ route: "/multiple_statistics" }),
-          get({ route: "/multiple_time_statistics" }),
+          get({ route: "/statistics" }),
+          get({ route: "/time_statistics" }),
           get({ route: "/multiple_trafficgen" }),
         ]);
 
@@ -86,9 +49,9 @@ const Test = () => {
         responseTimeStatistics?.status === 200 &&
         responseTrafficGen?.status === 200
       ) {
-        setMultipleStatistics(responseStatistics.data || []);
-        setMultipleTimeStatistics(responseTimeStatistics.data || []);
-        setTrafficGenData(responseTrafficGen.data[0] || null); // Assuming the data is wrapped in an array
+        setStatistics(responseStatistics.data || null);
+        setTimeStatistics(responseTimeStatistics.data || null);
+        setTrafficGenData(responseTrafficGen.data || null);
         setMessage("Statistiken erfolgreich geladen.");
       } else {
         setMessage("Fehler beim Laden der Statistiken.");
@@ -109,22 +72,20 @@ const Test = () => {
   }, []);
 
   const handleSelectTest = (testNumber: number) => {
-    const selectedMultipleStatistics =
-      multipleStatistics.find((test) => test.test_number === testNumber) ||
-      null;
-    const selectedMultipleTimeStatistics =
-      multipleTimeStatistics.find((test) => test.test_number === testNumber) ||
-      null;
-    const selectedTrafficGen =
-      trafficGenData?.traffic_generations[testNumber - 1] || null;
+    const selectedStatistics =
+      statistics?.previous_statistics?.[testNumber - 1] || null;
+    const selectedTimeStatistics =
+      timeStatistics?.previous_time_statistics?.[testNumber - 1] || null;
+    const selectedTrafficGen = trafficGenData
+      ? trafficGenData[testNumber - 1]
+      : null;
 
     setSelectedTest({
-      multipleStatistics: selectedMultipleStatistics,
-      multipleTimeStatistics: selectedMultipleTimeStatistics,
+      statistics: selectedStatistics,
+      timeStatistics: selectedTimeStatistics,
       trafficGen: selectedTrafficGen,
     });
     setCurrentTest(testNumber); // Update the current test number
-    console.log(selectedTest);
   };
 
   const [currentLanguage, setCurrentLanguage] = useState(
@@ -134,7 +95,7 @@ const Test = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       const storedLanguage = localStorage.getItem("language") || "en-US";
-      if (storedLanguage != currentLanguage) {
+      if (storedLanguage !== currentLanguage) {
         setCurrentLanguage(storedLanguage);
       }
     }, 100);
@@ -144,154 +105,134 @@ const Test = () => {
   return (
     <>
       {message && <Alert variant="info">{message}</Alert>}
-      {multipleStatistics.length > 0 && multipleTimeStatistics.length > 0 && (
-        <>
-          <DropdownButton
-            id="dropdown-basic-button"
-            title={
-              selectedTest.multipleStatistics !== null
-                ? `Test ${selectedTest.multipleStatistics.test_number}`
-                : "Wähle einen Test"
-            }
-            onSelect={(eventKey) => handleSelectTest(Number(eventKey))}
-          >
-            {multipleStatistics.map((test) => (
-              <Dropdown.Item key={test.test_number} eventKey={test.test_number}>
-                Test {test.test_number}
-              </Dropdown.Item>
-            ))}
-          </DropdownButton>
-          {selectedTest.multipleStatistics &&
-            selectedTest.multipleTimeStatistics && (
-              <>
-                <Tabs defaultActiveKey="Summary" className="mt-3">
-                  <Tab
-                    eventKey="Summary"
-                    title={translate("Summary", currentLanguage)}
-                  >
-                    <StatView
-                      stats={selectedTest.multipleStatistics.statistics}
-                      time_stats={
-                        selectedTest.multipleTimeStatistics.time_statistics
-                      }
-                      port_mapping={
-                        selectedTest.trafficGen?.port_tx_rx_mapping || {}
-                      }
-                      visual={true}
-                      mode={selectedTest.trafficGen?.mode || 0}
-                    />
-                  </Tab>
-                  {activePorts(
-                    selectedTest.trafficGen?.port_tx_rx_mapping || {}
-                  ).map((v, i) => {
-                    let mapping: { [name: number]: number } = { [v.tx]: v.rx };
-                    return (
-                      <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
-                        <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
-                          <Tab eventKey={"Overview"} title={"Overview"}>
-                            {selectedTest.multipleStatistics &&
-                              selectedTest.multipleTimeStatistics && (
-                                <>
-                                  <StatView
-                                    stats={
-                                      selectedTest.multipleStatistics.statistics
-                                    }
-                                    time_stats={
-                                      selectedTest.multipleTimeStatistics
-                                        .time_statistics
-                                    }
-                                    port_mapping={mapping}
-                                    mode={selectedTest.trafficGen?.mode || 0}
-                                    visual={true}
-                                  />
-                                </>
-                              )}
-                          </Tab>
-                          {Object.keys(mapping)
-                            .map(Number)
-                            .map((v) => {
-                              let stream_ids = getStreamIDsByPort(
-                                v,
-                                selectedTest.trafficGen?.stream_settings || [],
-                                selectedTest.trafficGen?.streams || []
-                              );
-                              return stream_ids.map((stream: number, i) => {
-                                let stream_frame_size = getStreamFrameSize(
-                                  selectedTest.trafficGen?.streams || [],
-                                  stream
+      {statistics && timeStatistics && (
+        <Tabs
+          defaultActiveKey="Test 1"
+          onSelect={(eventKey) => handleSelectTest(Number(eventKey))}
+        >
+          {(statistics.previous_statistics || []).map((test, index) => (
+            <Tab
+              key={index + 1}
+              eventKey={index + 1}
+              title={`Test ${index + 1}`}
+            >
+              {selectedTest.statistics && selectedTest.timeStatistics && (
+                <>
+                  <Tabs defaultActiveKey="Summary" className="mt-3">
+                    <Tab
+                      eventKey="Summary"
+                      title={translate("Summary", currentLanguage)}
+                    >
+                      <StatView
+                        stats={selectedTest.statistics}
+                        time_stats={selectedTest.timeStatistics}
+                        port_mapping={
+                          selectedTest.trafficGen?.port_tx_rx_mapping || {}
+                        }
+                        visual={true}
+                        mode={selectedTest.trafficGen?.mode || 0}
+                      />
+                    </Tab>
+                    {activePorts(
+                      selectedTest.trafficGen?.port_tx_rx_mapping || {}
+                    ).map((v, i) => {
+                      let mapping: { [name: number]: number } = {
+                        [v.tx]: v.rx,
+                      };
+                      return (
+                        <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
+                          <Tabs
+                            defaultActiveKey={"Overview"}
+                            className={"mt-3"}
+                          >
+                            <Tab eventKey={"Overview"} title={"Overview"}>
+                              {selectedTest.statistics &&
+                                selectedTest.timeStatistics && (
+                                  <>
+                                    <StatView
+                                      stats={selectedTest.statistics}
+                                      time_stats={selectedTest.timeStatistics}
+                                      port_mapping={mapping}
+                                      mode={selectedTest.trafficGen?.mode || 0}
+                                      visual={true}
+                                    />
+                                  </>
+                                )}
+                            </Tab>
+                            {Object.keys(mapping)
+                              .map(Number)
+                              .map((v) => {
+                                let stream_ids = getStreamIDsByPort(
+                                  v,
+                                  selectedTest.trafficGen?.stream_settings ||
+                                    [],
+                                  selectedTest.trafficGen?.streams || []
                                 );
-                                return (
-                                  <Tab
-                                    key={i}
-                                    eventKey={stream}
-                                    title={"Stream " + stream}
-                                  >
-                                    {selectedTest.multipleStatistics &&
-                                      selectedTest.multipleTimeStatistics && (
-                                        <>
-                                          <StreamView
-                                            stats={
-                                              selectedTest.multipleStatistics
-                                                .statistics
-                                            }
-                                            port_mapping={mapping}
-                                            stream_id={stream}
-                                            frame_size={stream_frame_size}
-                                          />
-                                        </>
-                                      )}
-                                  </Tab>
-                                );
-                              });
-                            })}
-                        </Tabs>
-                      </Tab>
-                    );
-                  })}
-                </Tabs>
-                <Row>
-                  <Col>
-                    <h3>
-                      Details für Test{" "}
-                      {selectedTest.multipleStatistics.test_number}
-                    </h3>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col>
-                    <h4>Statistics:</h4>
-                    <pre>
-                      {JSON.stringify(
-                        selectedTest.multipleStatistics.statistics,
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </Col>
-                  <Col>
-                    <h4>Time Statistics:</h4>
-                    <pre>
-                      {JSON.stringify(
-                        selectedTest.multipleTimeStatistics.time_statistics,
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </Col>
-                  <Col>
-                    <h4>Port Mappings:</h4>
-                    <pre>
-                      {JSON.stringify(
-                        selectedTest.trafficGen?.port_tx_rx_mapping,
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </Col>
-                </Row>
-              </>
-            )}
-        </>
+                                return stream_ids.map((stream: number, i) => {
+                                  let stream_frame_size = getStreamFrameSize(
+                                    selectedTest.trafficGen?.streams || [],
+                                    stream
+                                  );
+                                  return (
+                                    <Tab
+                                      key={i}
+                                      eventKey={stream}
+                                      title={"Stream " + stream}
+                                    >
+                                      {selectedTest.statistics &&
+                                        selectedTest.timeStatistics && (
+                                          <>
+                                            <StreamView
+                                              stats={selectedTest.statistics}
+                                              port_mapping={mapping}
+                                              stream_id={stream}
+                                              frame_size={stream_frame_size}
+                                            />
+                                          </>
+                                        )}
+                                    </Tab>
+                                  );
+                                });
+                              })}
+                          </Tabs>
+                        </Tab>
+                      );
+                    })}
+                  </Tabs>
+                  <Row>
+                    <Col>
+                      <h3>Details für Test {index + 1}</h3>
+                    </Col>
+                  </Row>
+                  <Row>
+                    <Col>
+                      <h4>Statistics:</h4>
+                      <pre>
+                        {JSON.stringify(selectedTest.statistics, null, 2)}
+                      </pre>
+                    </Col>
+                    <Col>
+                      <h4>Time Statistics:</h4>
+                      <pre>
+                        {JSON.stringify(selectedTest.timeStatistics, null, 2)}
+                      </pre>
+                    </Col>
+                    <Col>
+                      <h4>Port Mappings:</h4>
+                      <pre>
+                        {JSON.stringify(
+                          selectedTest.trafficGen?.port_tx_rx_mapping,
+                          null,
+                          2
+                        )}
+                      </pre>
+                    </Col>
+                  </Row>
+                </>
+              )}
+            </Tab>
+          ))}
+        </Tabs>
       )}
     </>
   );

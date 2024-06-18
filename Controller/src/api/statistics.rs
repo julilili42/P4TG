@@ -64,7 +64,9 @@ pub struct Statistics {
     /// Number of out of order packets per port.
     pub(crate) out_of_order: HashMap<u32, u64>,
     /// Elapsed time since the traffic generation has started in seconds.
-    pub(crate) elapsed_time: u32
+    pub(crate) elapsed_time: u32,
+    /// Save previous statistics
+    pub(crate) previous_statistics: Option<Vec<Statistics>>,
 }
 
 #[utoipa::path(
@@ -82,6 +84,7 @@ pub async fn statistics(State(state): State<Arc<AppState>>) -> Response {
     let frame_size_monitor = &state.frame_size_monitor;
     let frame_type_monitor = &state.frame_type_monitor;
     let rate_monitor = &state.rate_monitor;
+    let previous_statistics = state.collected_statistics.lock().await.clone();
 
     let mut stats = Statistics {
         sample_mode: state.sample_mode,
@@ -97,7 +100,8 @@ pub async fn statistics(State(state): State<Arc<AppState>>) -> Response {
         rtts: Default::default(),
         packet_loss: Default::default(),
         out_of_order: Default::default(),
-        elapsed_time: 0
+        elapsed_time: 0,
+        previous_statistics: Some(previous_statistics),
     };
 
 
@@ -190,6 +194,8 @@ pub struct Params {
 pub async fn time_statistics(State(state): State<Arc<AppState>>, Query(params): Query<Params>) -> Response {
     let rate_monitor = &state.rate_monitor;
     let stats = rate_monitor.lock().await.time_statistics.clone();
+    let previous_time_statistics = state.collected_time_statistics.lock().await.clone();
+
 
     let limit = params.limit.unwrap_or(usize::MAX);
 
@@ -236,7 +242,8 @@ pub async fn time_statistics(State(state): State<Arc<AppState>>, Query(params): 
         rx_rate_l1: rx,
         packet_loss,
         out_of_order,
-        rtt
+        rtt,
+        previous_time_statistics: Some(previous_time_statistics),
     };
 
     (StatusCode::OK, Json(stats)).into_response()

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::thread;
+use tokio::task;
 use std::time::Duration;
 use axum::debug_handler;
 use axum::extract::State;
@@ -15,23 +15,24 @@ use crate::api::statistics::{Statistics, statistics, time_statistics};
 use axum::extract::Query;
 use crate::core::statistics::TimeStatistic;
 use axum::body::{self};
-use log::info;
+use log::{info, error};
 
 /// Method called on POST /multiple_trafficgen
 /// Starts the tests of multiple traffic generations with the specified settings and durations in the POST body
 #[debug_handler]
-pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, Json(payload): Json<MultipleTrafficGen>) -> Response {
+pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, Json(payload): Json<Vec<TrafficGenData>>) -> Response {
     if !validate_payload(&payload) {
-        return (StatusCode::BAD_REQUEST, Json(Error::new("Each TrafficGenData must have a corresponding duration."))).into_response();
+        return (StatusCode::BAD_REQUEST, Json(Error::new("Each TrafficGenData must have a valid duration."))).into_response();
     }
 
     info!("Starting multiple traffic generations");
 
     let state_clone = Arc::clone(&state);
     let payload_clone = payload.clone();
-
-    // Reset of statistics and traffic_generators in Appstate 
+    
+    // Reset of statistics and traffic_generators in Appstate, start of experiment
     {
+
         let mut collected_statistics = state_clone.collected_statistics.lock().await;
         collected_statistics.clear();
 
@@ -40,103 +41,64 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
 
         let mut multiple_traffic_generators = state_clone.multiple_traffic_generators.lock().await;
         multiple_traffic_generators.clear(); 
-        multiple_traffic_generators.push(payload_clone.clone());
+        multiple_traffic_generators.extend(payload_clone.clone());
     }
 
+    task::spawn(async move {
+        // Iterate over all traffic_generations which were included in the payload
+        for (i, tg_data) in payload_clone.iter().enumerate() {
 
-    thread::spawn(move || {
-        tokio::runtime::Runtime::new().unwrap().block_on(async move {
-            // Iterate over all traffic_generations and their durations, which were included in the payload
-            for (i, (tg_data, duration)) in payload_clone.traffic_generations.iter().zip(payload_clone.durations.iter()).enumerate() {
+            info!("Starting test {} with duration {:?} seconds", i + 1, tg_data.duration);
 
-                info!("Starting test {} with duration {:?} seconds", i + 1, duration);
-
-                let mut test_completed = true;
             // Starting the traffic generation
-                let configure_response = start_traffic_gen(State(Arc::clone(&state_clone)), Json(tg_data.clone())).await;
+            let configure_response = start_traffic_gen(State(Arc::clone(&state_clone)), Json(tg_data.clone())).await;
 
-                if configure_response.status() != StatusCode::OK {
-                    eprintln!("Failed to configure traffic generation: {:?}", configure_response);
-                    return;
-                }
-            
+            if configure_response.status() != StatusCode::OK {
+                error!("Failed to configure traffic generation: {:?}", configure_response);
+                return;
+            }
+
             // Check if user wants to skip a traffic generation
-                match duration {
-                    Some(d) => {
-                        for _ in 0..*d {
-                            {
-                                let experiment = state_clone.experiment.lock().await;
-                                if !experiment.running {
-                                    info!("Skipping test {}", i + 1);
-                                    test_completed = false;
-                                    break;
-                                }
-                            }
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                        }
-                    },
-                    None => {
-                        loop {
-                            {
-                                let experiment = state_clone.experiment.lock().await;
-                                if !experiment.running {
-                                    info!("Ending single test");
-                                    test_completed = true;
-                                    break;
-                                }
-                            }
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                        }
-                    }
-                }
-                
-                let stop_response = stop_traffic_gen(State(Arc::clone(&state_clone))).await;
+            monitor_test_duration(Arc::clone(&state_clone), tg_data.duration, i).await;
 
-                if stop_response.status() != StatusCode::OK {
-                    // change
-                    eprintln!("Failed to stop traffic generation: {:?}", stop_response);
-                    return;
-                }
-                
-                // Using statistics endpoint to retrieve the statistics of the current test
-                let stats_response = statistics(State(Arc::clone(&state_clone))).await;
-                if let Ok(stats) = parse_stats_response(stats_response).await {
-                    let test_result = MultipleStatistics {
-                        test_number: i + 1,
-                        completed: test_completed,
-                        duration: duration.unwrap_or(u64::MAX),
-                        statistics: stats,
-                    };
+            let stop_response = stop_traffic_gen(State(Arc::clone(&state_clone))).await;
 
-                // Storing the statistics in the AppState
-                    state_clone.collected_statistics.lock().await.push(test_result.clone());
-                } else {
-                    println!("Failed to retrieve statistics for test {}", i + 1);
-                }
+            if stop_response.status() != StatusCode::OK {
+                // change
+                error!("Failed to stop traffic generation: {:?}", stop_response);
+                return;
+            }
 
-                // Using time_statistics endpoint to retrieve the statistics of the current test
-                let time_stats_response = time_statistics(State(Arc::clone(&state_clone)), Query(Default::default())).await;
-                if let Ok(time_stats) = parse_time_stats_response(time_stats_response).await {
-                let time_statistics_result = MultipleTimeStatistics {
-                    test_number: i + 1,
-                    completed: test_completed,
-                    duration: duration.unwrap_or(u64::MAX),
-                    time_statistics: time_stats,
-                };
 
-                // Storing the time_statistics in the AppState
-                state_clone.collected_time_statistics.lock().await.push(time_statistics_result);
+            // Using statistics endpoint to retrieve the statistics of the current test
+            let stats_response = statistics(State(Arc::clone(&state_clone))).await;
+            if let Ok(mut stats) = parse_stats_response(stats_response).await {
+                // Entferne die rekursiven `previous_statistics` bevor sie gespeichert werden
+                stats.previous_statistics = None;
+                state_clone.collected_statistics.lock().await.push(stats.clone());
             } else {
-                println!("Failed to retrieve time statistics for test {}", i + 1);
-            }
+                error!("Failed to retrieve statistics for test {}", i + 1);
             }
 
-        });
+            // Using time_statistics endpoint to retrieve the statistics of the current test
+            let time_stats_response = time_statistics(State(Arc::clone(&state_clone)), Query(Default::default())).await;
+            if let Ok(mut time_stats) = parse_time_stats_response(time_stats_response).await {
+                // Storing the time_statistics in the AppState
+                time_stats.previous_time_statistics = None;
+                state_clone.collected_time_statistics.lock().await.push(time_stats.clone());
+            } else {
+                error!("Failed to retrieve time statistics for test {}", i + 1);
+            }
+        }
+
+        // Set the running flag to false after the last test
+        let mut experiment = state_clone.experiment.lock().await;
+        experiment.running = false;
     });
-
 
     StatusCode::OK.into_response()
 }
+
 
 
 
@@ -154,27 +116,24 @@ pub async fn multiple_traffic_gen(State(state): State<Arc<AppState>>) -> Respons
 
 
 
-// Extracts the HTTP Response body of the statistics endpoint
+
+/// Extracts the HTTP Response body of the statistics endpoint
 async fn parse_stats_response(stats_response: Response<axum::body::Body>) -> Result<Statistics, serde_json::Error> {
     let body_bytes = body::to_bytes(stats_response.into_body(), 1024 * 1024).await.unwrap();
     serde_json::from_slice(&body_bytes)
 }
 
-// Extracts the HTTP Response body of the time_statistics endpoint
+/// Extracts the HTTP Response body of the time_statistics endpoint
 async fn parse_time_stats_response(time_stats_response: Response<axum::body::Body>) -> Result<TimeStatistic, serde_json::Error> {
     let body_bytes = axum::body::to_bytes(time_stats_response.into_body(), 1024 * 1024).await.unwrap();
     serde_json::from_slice(&body_bytes)
 }
 
-// Checks Payload if the format is correct 
-fn validate_payload(payload: &MultipleTrafficGen) -> bool {
-    if payload.traffic_generations.len() != payload.durations.len() {
-        return false;
-    }
-
-    for duration in &payload.durations {
-        match duration {
-            Some(d) if *d > 0 => continue,
+/// Checks Payload if the format is correct 
+fn validate_payload(payload: &Vec<TrafficGenData>) -> bool {
+    for tg_data in payload {
+        match tg_data.duration {
+            Some(d) if d > 0 => continue,
             None => continue,
             _ => return false,
         }
@@ -183,7 +142,49 @@ fn validate_payload(payload: &MultipleTrafficGen) -> bool {
     true
 }
 
-// Starts single traffic generation
+/// Monitors the duration of a test and regularly checks if the test has been aborted.
+async fn monitor_test_duration(
+    state: Arc<AppState>, 
+    duration: Option<u64>, 
+    test_index: usize
+) {
+    match duration {
+        Some(d) => {
+            let start_time = SystemTime::now();
+            let end_time = start_time + Duration::from_secs(d);
+
+            loop {
+                let now = SystemTime::now();
+                if now >= end_time {
+                    break;
+                }
+                {
+                    let experiment = state.experiment.lock().await;
+                    if !experiment.running {
+                        info!("Skipping test {}", test_index + 1);
+                        break;
+                    }
+                }
+                let remaining_duration = end_time.duration_since(now).unwrap_or_default();
+                tokio::time::sleep(remaining_duration.min(Duration::from_millis(100))).await;
+            }
+        },
+        None => {
+            loop {
+                {
+                    let experiment = state.experiment.lock().await;
+                    if !experiment.running {
+                        info!("Ending single test");
+                        break;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
+}
+
+/// Starts single traffic generation
 async fn start_traffic_gen(State(state): State<Arc<AppState>>, payload: Json<TrafficGenData>) -> Response {
     let tg = &mut state.traffic_generator.lock().await;
 

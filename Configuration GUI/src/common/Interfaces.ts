@@ -82,6 +82,7 @@ export interface Statistics {
   };
   out_of_order: { [name: string]: number };
   elapsed_time: number;
+  previous_statistics?: Statistics[];
 }
 
 export const StatisticsObject: Statistics = {
@@ -112,6 +113,7 @@ export interface TimeStatistics {
       [name: number]: number;
     };
   };
+  previous_time_statistics?: TimeStatistics[];
 }
 
 export const TimeStatisticsObject: TimeStatistics = {
@@ -255,4 +257,5 @@ export interface TrafficGenData {
   streams: Stream[];
   stream_settings: StreamSettings[];
   port_tx_rx_mapping: { [name: number]: number };
+  duration?: number;
 }

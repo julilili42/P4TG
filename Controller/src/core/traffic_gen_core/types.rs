@@ -22,8 +22,6 @@ use std::net::Ipv4Addr;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use utoipa::ToSchema;
-use crate::api::statistics::Statistics;
-use crate::core::statistics::TimeStatistic;
 
 /// Describes the supported encapsulations of P4TG.
 /// Currently, only MPLS, VLAN and QinQ are supported.
@@ -128,7 +126,9 @@ pub struct TrafficGenData {
     pub(crate) streams: Vec<Stream>,
     /// Mapping between TX (send) ports, and RX (receive) ports.
     /// Traffic send on port TX are expected to be received on port RX.
-    pub(crate) port_tx_rx_mapping: HashMap<u32, u32>
+    pub(crate) port_tx_rx_mapping: HashMap<u32, u32>,
+    /// Optional duration for each traffic generation
+    pub(crate) duration: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
@@ -249,29 +249,3 @@ pub struct EmptyResponse {
 pub struct Reset {
     pub(crate) message: String
 }
-
-// Added for multiple traffic generators
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MultipleStatistics {
-    pub test_number: usize,
-    pub completed: bool,
-    pub duration: u64,
-    pub statistics: Statistics,
-}
-
-#[derive(Serialize, Deserialize, Clone, ToSchema)]
-pub struct MultipleTimeStatistics {
-    pub test_number: usize,
-    pub completed: bool,
-    pub duration: u64,
-    pub time_statistics: TimeStatistic,
-}
-
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct MultipleTrafficGen {
-    pub traffic_generations: Vec<TrafficGenData>,
-    pub durations: Vec<Option<u64>>,
-} 
-

@@ -238,25 +238,22 @@ const Home = () => {
         stream_settings: stream_settings,
         port_tx_rx_mapping: port_tx_rx_mapping,
         mode: mode,
+        duration: 10,
       },
       {
         streams: streams,
         stream_settings: stream_settings,
         port_tx_rx_mapping: port_tx_rx_mapping,
         mode: mode,
+        duration: 20,
       },
     ];
-
-    const durations = [10, 10];
-
-    let msg = await post({
+    set_overlay(true);
+    await post({
       route: "/multiple_trafficgen",
-      body: {
-        traffic_generations: traffic_generations,
-        durations: durations,
-      },
+      body: traffic_generations,
     });
-    console.log(msg);
+    set_overlay(false);
   };
 
   const loadStatistics = async () => {
