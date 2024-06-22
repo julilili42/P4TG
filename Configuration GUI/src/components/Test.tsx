@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { get } from "../common/API";
-import { Alert, Row, Col, Tabs, Tab } from "react-bootstrap";
+import { Alert, Tabs, Tab } from "react-bootstrap";
 import {
   Statistics as StatInterface,
   TimeStatistics,
@@ -73,9 +73,9 @@ const Test = () => {
 
   const handleSelectTest = (testNumber: number) => {
     const selectedStatistics =
-      statistics?.previous_statistics?.[testNumber - 1] || null;
+      statistics?.previous_statistics?.[testNumber] || null;
     const selectedTimeStatistics =
-      timeStatistics?.previous_time_statistics?.[testNumber - 1] || null;
+      timeStatistics?.previous_time_statistics?.[testNumber] || null;
     const selectedTrafficGen = trafficGenData
       ? trafficGenData[testNumber - 1]
       : null;
@@ -110,12 +110,8 @@ const Test = () => {
           defaultActiveKey="Test 1"
           onSelect={(eventKey) => handleSelectTest(Number(eventKey))}
         >
-          {(statistics.previous_statistics || []).map((test, index) => (
-            <Tab
-              key={index + 1}
-              eventKey={index + 1}
-              title={`Test ${index + 1}`}
-            >
+          {Object.keys(statistics.previous_statistics || {}).map((key) => (
+            <Tab key={Number(key)} eventKey={Number(key)} title={`Test ${key}`}>
               {selectedTest.statistics && selectedTest.timeStatistics && (
                 <>
                   <Tabs defaultActiveKey="Summary" className="mt-3">
@@ -199,35 +195,6 @@ const Test = () => {
                       );
                     })}
                   </Tabs>
-                  <Row>
-                    <Col>
-                      <h3>Details für Test {index + 1}</h3>
-                    </Col>
-                  </Row>
-                  <Row>
-                    <Col>
-                      <h4>Statistics:</h4>
-                      <pre>
-                        {JSON.stringify(selectedTest.statistics, null, 2)}
-                      </pre>
-                    </Col>
-                    <Col>
-                      <h4>Time Statistics:</h4>
-                      <pre>
-                        {JSON.stringify(selectedTest.timeStatistics, null, 2)}
-                      </pre>
-                    </Col>
-                    <Col>
-                      <h4>Port Mappings:</h4>
-                      <pre>
-                        {JSON.stringify(
-                          selectedTest.trafficGen?.port_tx_rx_mapping,
-                          null,
-                          2
-                        )}
-                      </pre>
-                    </Col>
-                  </Row>
                 </>
               )}
             </Tab>

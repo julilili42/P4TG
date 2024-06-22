@@ -176,7 +176,10 @@ pub struct TimeStatistic {
     pub(crate) packet_loss: BTreeMap<u32, BTreeMap<u32, u64>>,
     pub(crate) out_of_order: BTreeMap<u32, BTreeMap<u32, u64>>,
     pub(crate) rtt: BTreeMap<u32, BTreeMap<u32, u64>>,
-    pub(crate) previous_time_statistics: Option<Vec<TimeStatistic>>,
+    /// Save previous time statistics, where the key is the test number of the statistics. 
+    /// Skip serializing if there are no previous time statistics.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) previous_time_statistics: Option<BTreeMap<u32, TimeStatistic>>,
 }
 
 impl TimeStatistic {

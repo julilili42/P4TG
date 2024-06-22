@@ -51,6 +51,8 @@ use crate::core::traffic_gen_core::types::*;
 pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
     let tg = &state.traffic_generator.lock().await;
 
+
+
     if !tg.running {
         (StatusCode::ACCEPTED, Json(EmptyResponse{message: "Not running.".to_string()})).into_response()
     }

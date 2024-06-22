@@ -115,6 +115,22 @@ pub struct MPLSHeader {
     pub ttl: u32
 }
 
+/// Holds test informations
+#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
+pub struct TestInfo {
+    pub current_test_number: usize,
+    pub total_tests: usize,
+}
+
+impl Default for TestInfo {
+    fn default() -> Self {
+        TestInfo {
+            current_test_number: 0,
+            total_tests: 0,
+        }
+    }
+}
+
 /// Represents the body of the GET / POST endpoints of /trafficgen
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct TrafficGenData {

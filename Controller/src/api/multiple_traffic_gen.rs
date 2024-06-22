@@ -1,10 +1,10 @@
 use std::sync::Arc;
-use tokio::task;
 use std::time::Duration;
 use axum::debug_handler;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json, Response};
+use serde::de::DeserializeOwned;
 use crate::api::helper::validate::validate_request;
 use std::time::SystemTime;
 use crate::api::server::Error;
@@ -29,22 +29,11 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
 
     let state_clone = Arc::clone(&state);
     let payload_clone = payload.clone();
+    let number_of_tests = payload_clone.len();
     
-    // Reset of statistics and traffic_generators in Appstate, start of experiment
-    {
+    reset_and_start_experiment(state_clone.clone(), payload_clone.clone()).await;
 
-        let mut collected_statistics = state_clone.collected_statistics.lock().await;
-        collected_statistics.clear();
-
-        let mut collected_time_statistics = state_clone.collected_time_statistics.lock().await; 
-        collected_time_statistics.clear();
-
-        let mut multiple_traffic_generators = state_clone.multiple_traffic_generators.lock().await;
-        multiple_traffic_generators.clear(); 
-        multiple_traffic_generators.extend(payload_clone.clone());
-    }
-
-    task::spawn(async move {
+    tokio::spawn(async move {
         // Iterate over all traffic_generations which were included in the payload
         for (i, tg_data) in payload_clone.iter().enumerate() {
 
@@ -58,36 +47,21 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
                 return;
             }
 
-            // Check if user wants to skip a traffic generation
             monitor_test_duration(Arc::clone(&state_clone), tg_data.duration, i).await;
 
             let stop_response = stop_traffic_gen(State(Arc::clone(&state_clone))).await;
 
             if stop_response.status() != StatusCode::OK {
-                // change
                 error!("Failed to stop traffic generation: {:?}", stop_response);
                 return;
             }
 
-
-            // Using statistics endpoint to retrieve the statistics of the current test
-            let stats_response = statistics(State(Arc::clone(&state_clone))).await;
-            if let Ok(mut stats) = parse_stats_response(stats_response).await {
-                // Entferne die rekursiven `previous_statistics` bevor sie gespeichert werden
-                stats.previous_statistics = None;
-                state_clone.collected_statistics.lock().await.push(stats.clone());
-            } else {
-                error!("Failed to retrieve statistics for test {}", i + 1);
-            }
-
-            // Using time_statistics endpoint to retrieve the statistics of the current test
-            let time_stats_response = time_statistics(State(Arc::clone(&state_clone)), Query(Default::default())).await;
-            if let Ok(mut time_stats) = parse_time_stats_response(time_stats_response).await {
-                // Storing the time_statistics in the AppState
-                time_stats.previous_time_statistics = None;
-                state_clone.collected_time_statistics.lock().await.push(time_stats.clone());
-            } else {
-                error!("Failed to retrieve time statistics for test {}", i + 1);
+            // Save statistics if multi test is running
+            if number_of_tests > 1 {
+             if let Err(err) = save_statistics(Arc::clone(&state_clone), i).await {
+                error!("Failed to save the statistics of the current test {}: {}", i, err);
+                return;
+             } 
             }
         }
 
@@ -104,7 +78,6 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
 
 /// Method called on GET /multiple_trafficgen
 /// Returns a list of currently configured traffic generations
-#[debug_handler]
 pub async fn multiple_traffic_gen(State(state): State<Arc<AppState>>) -> Response {
     let configs = state.multiple_traffic_generators.lock().await;
     (StatusCode::OK, Json(configs.clone())).into_response()
@@ -112,22 +85,13 @@ pub async fn multiple_traffic_gen(State(state): State<Arc<AppState>>) -> Respons
 
 
 
-
-
-
-
-
-/// Extracts the HTTP Response body of the statistics endpoint
-async fn parse_stats_response(stats_response: Response<axum::body::Body>) -> Result<Statistics, serde_json::Error> {
-    let body_bytes = body::to_bytes(stats_response.into_body(), 1024 * 1024).await.unwrap();
+/// Extracts the HTTP Response body
+async fn parse_response<T: DeserializeOwned>(response: Response<axum::body::Body>) -> Result<T, serde_json::Error> {
+    let body_bytes = body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     serde_json::from_slice(&body_bytes)
 }
 
-/// Extracts the HTTP Response body of the time_statistics endpoint
-async fn parse_time_stats_response(time_stats_response: Response<axum::body::Body>) -> Result<TimeStatistic, serde_json::Error> {
-    let body_bytes = axum::body::to_bytes(time_stats_response.into_body(), 1024 * 1024).await.unwrap();
-    serde_json::from_slice(&body_bytes)
-}
+
 
 /// Checks Payload if the format is correct 
 fn validate_payload(payload: &Vec<TrafficGenData>) -> bool {
@@ -183,6 +147,45 @@ async fn monitor_test_duration(
         }
     }
 }
+
+// Reset of statistics and traffic_generators in Appstate, start of experiment
+async fn reset_and_start_experiment(state_clone: Arc<AppState>, payload_clone: Vec<TrafficGenData>) {
+    let mut collected_statistics = state_clone.collected_statistics.lock().await;
+    collected_statistics.clear();
+
+    let mut collected_time_statistics = state_clone.collected_time_statistics.lock().await; 
+    collected_time_statistics.clear();
+
+    let mut multiple_traffic_generators = state_clone.multiple_traffic_generators.lock().await;
+    multiple_traffic_generators.clear(); 
+    multiple_traffic_generators.extend(payload_clone.clone());
+}
+
+// Save the statistics of the current test in Appstate
+async fn save_statistics(state_clone: Arc<AppState>, i: usize) -> Result<(), String> {
+    // Using statistics endpoint to retrieve the statistics of the current test
+    let stats_response = statistics(State(Arc::clone(&state_clone))).await;
+    if let Ok(mut stats) = parse_response::<Statistics>(stats_response).await {
+        // Storing statistics in AppState
+        stats.previous_statistics = None;
+        state_clone.collected_statistics.lock().await.push(stats.clone());
+    } else {
+        return Err(format!("Failed to retrieve statistics for test {}", i + 1));
+    }
+
+    // Using time_statistics endpoint to retrieve the statistics of the current test
+    let time_stats_response = time_statistics(State(Arc::clone(&state_clone)), Query(Default::default())).await;
+    if let Ok(mut time_stats) = parse_response::<TimeStatistic>(time_stats_response).await {
+        // Storing time_statistics in AppState
+        time_stats.previous_time_statistics = None;
+        state_clone.collected_time_statistics.lock().await.push(time_stats.clone());
+    } else {
+        return Err(format!("Failed to retrieve time statistics for test {}", i + 1));
+    }
+
+    Ok(())
+}
+
 
 /// Starts single traffic generation
 async fn start_traffic_gen(State(state): State<Arc<AppState>>, payload: Json<TrafficGenData>) -> Response {

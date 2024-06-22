@@ -13,8 +13,7 @@
  * limitations under the License.
  */
 
-use core::statistics::TimeStatistic;
-use core::traffic_gen_core::types::TrafficGenData;
+
 /*
  * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
  */
@@ -31,6 +30,8 @@ use rbfrt::error::RBFRTError;
 use rbfrt::util::port_manager::{AutoNegotiation, FEC, Loopback, Port, Speed};
 use rbfrt::util::PortManager;
 use tokio::sync::Mutex;
+use core::statistics::TimeStatistic;
+use core::traffic_gen_core::types::TrafficGenData;
 
 mod core;
 mod api;
@@ -223,6 +224,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         experiment: Mutex::new(Experiment { start: std::time::SystemTime::now(), running: false }),
         config: Mutex::new(config),
         arp_handler,
+        // Added for multiple traffic generators
         collected_statistics: Mutex::new(Vec::new()),
         collected_time_statistics: Mutex::new(Vec::new()),
         multiple_traffic_generators: Mutex::new(Vec::new()),

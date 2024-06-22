@@ -82,7 +82,7 @@ export interface Statistics {
   };
   out_of_order: { [name: string]: number };
   elapsed_time: number;
-  previous_statistics?: Statistics[];
+  previous_statistics?: { [key: number]: Statistics };
 }
 
 export const StatisticsObject: Statistics = {
@@ -100,6 +100,7 @@ export const StatisticsObject: Statistics = {
   app_rx_l2: {},
   out_of_order: {},
   elapsed_time: 0,
+  previous_statistics: {},
 };
 
 export interface TimeStatistics {
@@ -113,12 +114,13 @@ export interface TimeStatistics {
       [name: number]: number;
     };
   };
-  previous_time_statistics?: TimeStatistics[];
+  previous_time_statistics?: { [key: number]: TimeStatistics };
 }
 
 export const TimeStatisticsObject: TimeStatistics = {
   tx_rate_l1: {},
   rx_rate_l1: {},
+  previous_time_statistics: {},
 };
 
 export interface StreamSettings {

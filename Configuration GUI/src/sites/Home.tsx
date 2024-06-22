@@ -1,31 +1,10 @@
-/* Copyright 2022-present University of Tuebingen, Chair of Communication Networks
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/*
- * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
- */
-
-import React, { useEffect, useState } from "react";
-import { Button, Col, Form, Row, Tab, Tabs } from "react-bootstrap";
+import { useEffect, useState } from "react";
+import { Button, Col, Form, Row, Tab, Tabs, Alert } from "react-bootstrap";
 import { del, get, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
 import StatView from "../components/StatView";
 import Loader from "../components/Loader";
-
 import {
-  Encapsulation,
   GenerationMode,
   Statistics as StatInterface,
   StatisticsObject,
@@ -33,6 +12,7 @@ import {
   StreamSettings,
   TimeStatistics,
   TimeStatisticsObject,
+  TrafficGenData,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
@@ -40,13 +20,12 @@ import translate from "../components/translation/Translate";
 import HiddenGraphs from "../components/pdf/HiddenVisuals";
 import Download from "../components/Download";
 
-styled(Row)`
-  display: flex;
-  align-items: center;
-`;
-styled(Col)`
-  padding-left: 0;
-`;
+import {
+  activePorts,
+  getStreamFrameSize,
+  getStreamIDsByPort,
+} from "../common/utils/StatisticUtils";
+
 const StyledLink = styled.a`
   color: var(--color-secondary);
   text-decoration: none;
@@ -95,6 +74,16 @@ const Home = () => {
     useState<StatInterface>(StatisticsObject);
   const [time_statistics, set_time_statistics] =
     useState<TimeStatistics>(TimeStatisticsObject);
+  const [currentTest, setCurrentTest] = useState<number | null>(null);
+  const [selectedTest, setSelectedTest] = useState<{
+    statistics: StatInterface | null;
+    timeStatistics: TimeStatistics | null;
+    trafficGen: TrafficGenData | null;
+  }>({
+    statistics: null,
+    timeStatistics: null,
+    trafficGen: null,
+  });
 
   useEffect(() => {
     refresh();
@@ -126,67 +115,12 @@ const Home = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       const storedLanguage = localStorage.getItem("language") || "en-US";
-      if (storedLanguage != currentLanguage) {
+      if (storedLanguage !== currentLanguage) {
         setCurrentLanguage(storedLanguage);
       }
     }, 100);
     return () => clearInterval(interval);
   }, [currentLanguage]);
-
-  const activePorts = (): { tx: number; rx: number }[] => {
-    let active_ports: { tx: number; rx: number }[] = [];
-    let exists: number[] = [];
-
-    Object.keys(port_tx_rx_mapping).forEach((tx_port: string) => {
-      let port = parseInt(tx_port);
-      exists.push(port);
-      active_ports.push({ tx: port, rx: port_tx_rx_mapping[port] });
-    });
-
-    return active_ports;
-  };
-
-  const getStreamIDsByPort = (pid: number): number[] => {
-    let ret: number[] = [];
-
-    stream_settings.forEach((v) => {
-      if (v.port == pid && v.active) {
-        streams.forEach((s) => {
-          if (s.stream_id == v.stream_id) {
-            ret.push(s.app_id);
-            return;
-          }
-        });
-      }
-    });
-
-    return ret;
-  };
-
-  const getStreamFrameSize = (stream_id: number): number => {
-    let ret = 0;
-
-    streams.forEach((v) => {
-      if (v.app_id == stream_id) {
-        ret = v.frame_size;
-        if (v.encapsulation == Encapsulation.Q) {
-          ret += 4;
-        } else if (v.encapsulation == Encapsulation.QinQ) {
-          ret += 8;
-        } else if (v.encapsulation == Encapsulation.MPLS) {
-          ret += v.number_of_lse * 4; // 4 bytes per LSE
-        }
-
-        if (v.vxlan) {
-          ret += 50; // 50 bytes overhead
-        }
-
-        return;
-      }
-    });
-
-    return ret;
-  };
 
   const refresh = async () => {
     await loadGen();
@@ -238,14 +172,21 @@ const Home = () => {
         stream_settings: stream_settings,
         port_tx_rx_mapping: port_tx_rx_mapping,
         mode: mode,
-        duration: 10,
+        duration: 6,
       },
       {
         streams: streams,
         stream_settings: stream_settings,
         port_tx_rx_mapping: port_tx_rx_mapping,
         mode: mode,
-        duration: 20,
+        duration: 6,
+      },
+      {
+        streams: streams,
+        stream_settings: stream_settings,
+        port_tx_rx_mapping: port_tx_rx_mapping,
+        mode: mode,
+        duration: 4,
       },
     ];
     set_overlay(true);
@@ -292,7 +233,6 @@ const Home = () => {
         JSON.stringify(stats.data.port_tx_rx_mapping)
       );
 
-      //set_streams(stats.data.streams)
       set_running(true);
     } else {
       set_running(false);
@@ -320,6 +260,28 @@ const Home = () => {
 
   const handleGraphConvert = (newImageData: string[]) => {
     setImageData(newImageData);
+  };
+
+  const handleSelectTest = (testNumber: number) => {
+    const selectedStatistics =
+      statistics?.previous_statistics?.[testNumber] || null;
+    const selectedTimeStatistics =
+      time_statistics?.previous_time_statistics?.[testNumber] || null;
+    const selectedTrafficGen = streams
+      ? {
+          mode,
+          port_tx_rx_mapping,
+          streams,
+          stream_settings,
+        }
+      : null;
+
+    setSelectedTest({
+      statistics: selectedStatistics,
+      timeStatistics: selectedTimeStatistics,
+      trafficGen: selectedTrafficGen,
+    });
+    setCurrentTest(testNumber); // Update the current test number
   };
 
   return (
@@ -393,57 +355,158 @@ const Home = () => {
           label={translate("Visualization", currentLanguage)}
         />
       </Form>
-      <Tabs defaultActiveKey="Summary" className="mt-3">
-        <Tab eventKey="Summary" title={translate("Summary", currentLanguage)}>
-          <StatView
-            stats={statistics}
-            time_stats={time_statistics}
-            port_mapping={port_tx_rx_mapping}
-            visual={visual}
-            mode={mode}
-          />
-        </Tab>
-        {activePorts().map((v, i) => {
-          let mapping: { [name: number]: number } = { [v.tx]: v.rx };
-          return (
-            <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
-              <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
-                <Tab eventKey={"Overview"} title={"Overview"}>
-                  <StatView
-                    stats={statistics}
-                    time_stats={time_statistics}
-                    port_mapping={mapping}
-                    mode={mode}
-                    visual={visual}
-                  />
-                </Tab>
-                {Object.keys(mapping)
-                  .map(Number)
-                  .map((v) => {
-                    let stream_ids = getStreamIDsByPort(v);
 
-                    return stream_ids.map((stream: number, i) => {
-                      let stream_frame_size = getStreamFrameSize(stream);
-                      return (
-                        <Tab
-                          key={i}
-                          eventKey={stream}
-                          title={"Stream " + stream}
-                        >
-                          <StreamView
-                            stats={statistics}
-                            port_mapping={mapping}
-                            stream_id={stream}
-                            frame_size={stream_frame_size}
-                          />
-                        </Tab>
-                      );
-                    });
-                  })}
-              </Tabs>
+      <Tabs
+        defaultActiveKey="current"
+        className="mt-3"
+        onSelect={(eventKey) => handleSelectTest(Number(eventKey))}
+      >
+        <Tab eventKey="current" title={`Current`}>
+          <Tabs defaultActiveKey="Summary" className="mt-3">
+            <Tab
+              eventKey="Summary"
+              title={translate("Summary", currentLanguage)}
+            >
+              <StatView
+                stats={statistics}
+                time_stats={time_statistics}
+                port_mapping={port_tx_rx_mapping}
+                visual={visual}
+                mode={mode}
+              />
             </Tab>
-          );
-        })}
+            {activePorts(port_tx_rx_mapping).map((v, i) => {
+              let mapping: { [name: number]: number } = { [v.tx]: v.rx };
+              return (
+                <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
+                  <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
+                    <Tab eventKey={"Overview"} title={"Overview"}>
+                      <StatView
+                        stats={statistics}
+                        time_stats={time_statistics}
+                        port_mapping={mapping}
+                        mode={mode}
+                        visual={visual}
+                      />
+                    </Tab>
+                    {Object.keys(mapping)
+                      .map(Number)
+                      .map((v) => {
+                        let stream_ids = getStreamIDsByPort(
+                          v,
+                          stream_settings,
+                          streams
+                        );
+                        return stream_ids.map((stream: number, i) => {
+                          let stream_frame_size = getStreamFrameSize(
+                            streams,
+                            stream
+                          );
+                          return (
+                            <Tab
+                              key={i}
+                              eventKey={stream}
+                              title={"Stream " + stream}
+                            >
+                              <StreamView
+                                stats={statistics}
+                                port_mapping={mapping}
+                                stream_id={stream}
+                                frame_size={stream_frame_size}
+                              />
+                            </Tab>
+                          );
+                        });
+                      })}
+                  </Tabs>
+                </Tab>
+              );
+            })}
+          </Tabs>
+        </Tab>
+        {Object.keys(statistics.previous_statistics || {}).map((key) => (
+          <Tab key={Number(key)} eventKey={Number(key)} title={`Test ${key}`}>
+            <Tabs defaultActiveKey="Summary" className="mt-3">
+              <Tab
+                eventKey="Summary"
+                title={translate("Summary", currentLanguage)}
+              >
+                {selectedTest.statistics && selectedTest.timeStatistics && (
+                  <>
+                    <StatView
+                      stats={selectedTest.statistics}
+                      time_stats={selectedTest.timeStatistics}
+                      port_mapping={
+                        selectedTest.trafficGen?.port_tx_rx_mapping || {}
+                      }
+                      mode={selectedTest.trafficGen?.mode || 0}
+                      visual={visual}
+                    />
+                  </>
+                )}
+              </Tab>
+              {activePorts(
+                selectedTest.trafficGen?.port_tx_rx_mapping || {}
+              ).map((v, i) => {
+                let mapping: { [name: number]: number } = { [v.tx]: v.rx };
+                return (
+                  <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
+                    <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
+                      <Tab eventKey={"Overview"} title={"Overview"}>
+                        {selectedTest.statistics &&
+                          selectedTest.timeStatistics && (
+                            <>
+                              <StatView
+                                stats={selectedTest.statistics}
+                                time_stats={selectedTest.timeStatistics}
+                                port_mapping={mapping}
+                                mode={selectedTest.trafficGen?.mode || 0}
+                                visual={visual}
+                              />
+                            </>
+                          )}
+                      </Tab>
+                      {Object.keys(mapping)
+                        .map(Number)
+                        .map((v) => {
+                          let stream_ids = getStreamIDsByPort(
+                            v,
+                            selectedTest.trafficGen?.stream_settings || [],
+                            selectedTest.trafficGen?.streams || []
+                          );
+                          return stream_ids.map((stream: number, i) => {
+                            let stream_frame_size = getStreamFrameSize(
+                              selectedTest.trafficGen?.streams || [],
+                              stream
+                            );
+                            return (
+                              <Tab
+                                key={i}
+                                eventKey={stream}
+                                title={"Stream " + stream}
+                              >
+                                {selectedTest.statistics &&
+                                  selectedTest.timeStatistics && (
+                                    <>
+                                      <StreamView
+                                        stats={selectedTest.statistics}
+                                        port_mapping={mapping}
+                                        stream_id={stream}
+                                        frame_size={stream_frame_size}
+                                      />
+                                    </>
+                                  )}
+                              </Tab>
+                            );
+                          });
+                        })}
+                    </Tabs>
+                  </Tab>
+                );
+              })}
+            </Tabs>
+          </Tab>
+        ))}
       </Tabs>
       <GitHub />
     </Loader>
