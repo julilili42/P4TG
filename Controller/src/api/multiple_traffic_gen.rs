@@ -16,6 +16,7 @@ use axum::extract::Query;
 use crate::core::statistics::TimeStatistic;
 use axum::body::{self};
 use log::{info, error};
+use tokio::sync::watch;
 
 /// Method called on POST /multiple_trafficgen
 /// Starts the tests of multiple traffic generations with the specified settings and durations in the POST body
@@ -25,19 +26,33 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
         return (StatusCode::BAD_REQUEST, Json(Error::new("Each TrafficGenData must have a valid duration."))).into_response();
     }
 
+    // Abort any currently running test
+    abort_current_test(Arc::clone(&state)).await;
+
     info!("Starting multiple traffic generations");
 
     let state_clone = Arc::clone(&state);
     let payload_clone = payload.clone();
     let number_of_tests = payload_clone.len();
     
-    reset_and_start_experiment(state_clone.clone(), payload_clone.clone()).await;
+    let mut abort_rx = create_and_store_abort_sender(state_clone.clone()).await;
+    
+    reset_and_start_experiment(state_clone.clone(), payload_clone.clone()).await;    
 
     tokio::spawn(async move {
         // Iterate over all traffic_generations which were included in the payload
         for (i, tg_data) in payload_clone.iter().enumerate() {
 
-            info!("Starting test {} with duration {:?} seconds", i + 1, tg_data.duration);
+            let duration = tg_data.duration;
+
+            match duration {
+                Some(duration) => {
+                    info!("Starting test {} with duration {:?} seconds", i + 1, duration);
+                }
+                None => {
+                    info!("Starting single test with no duration");
+                }
+            }
 
             // Starting the traffic generation
             let configure_response = start_traffic_gen(State(Arc::clone(&state_clone)), Json(tg_data.clone())).await;
@@ -47,7 +62,10 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
                 return;
             }
 
-            monitor_test_duration(Arc::clone(&state_clone), tg_data.duration, i).await;
+            if let Err(_) = monitor_test_duration(state_clone.clone(), duration, i, &mut abort_rx).await {
+                info!("Test {} was aborted", i + 1);
+                break;
+            }
 
             let stop_response = stop_traffic_gen(State(Arc::clone(&state_clone))).await;
 
@@ -110,8 +128,9 @@ fn validate_payload(payload: &Vec<TrafficGenData>) -> bool {
 async fn monitor_test_duration(
     state: Arc<AppState>, 
     duration: Option<u64>, 
-    test_index: usize
-) {
+    test_index: usize,
+    abort_rx: &mut watch::Receiver<()>,
+) -> Result<(), ()> {
     match duration {
         Some(d) => {
             let start_time = SystemTime::now();
@@ -130,7 +149,13 @@ async fn monitor_test_duration(
                     }
                 }
                 let remaining_duration = end_time.duration_since(now).unwrap_or_default();
-                tokio::time::sleep(remaining_duration.min(Duration::from_millis(100))).await;
+                // Überwachung der verbleibenden Dauer oder des Abbruchsignals
+                tokio::select! {
+                    _ = tokio::time::sleep(remaining_duration.min(Duration::from_millis(100))) => {},
+                    _ = abort_rx.changed() => {
+                        return Err(());
+                    }
+                }
             }
         },
         None => {
@@ -142,10 +167,17 @@ async fn monitor_test_duration(
                         break;
                     }
                 }
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                // Überwachung der regelmäßigen Intervalle oder des Abbruchsignals
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_millis(100)) => {},
+                    _ = abort_rx.changed() => {
+                        return Err(());
+                    }
+                }
             }
         }
     }
+    Ok(())
 }
 
 // Reset of statistics and traffic_generators in Appstate, start of experiment
@@ -186,6 +218,29 @@ async fn save_statistics(state_clone: Arc<AppState>, i: usize) -> Result<(), Str
     Ok(())
 }
 
+// Creates abort sender and stores it in the AppState, s.t. other threads can abort the current test
+async fn create_and_store_abort_sender(state: Arc<AppState>) -> watch::Receiver<()> {
+    let (abort_tx, abort_rx) = watch::channel(());
+
+    {
+        let mut abort_sender = state.abort_sender.lock().await;
+        *abort_sender = Some(abort_tx);
+    }
+
+    abort_rx
+}
+
+
+
+// Funktion zum Abbrechen des aktuellen Tests
+async fn abort_current_test(state: Arc<AppState>) {
+    let abort_sender = state.abort_sender.lock().await.clone();
+    
+    if let Some(abort_tx) = abort_sender {
+        // Send the abort signal
+        let _ = abort_tx.send(());
+    }
+}
 
 /// Starts single traffic generation
 async fn start_traffic_gen(State(state): State<Arc<AppState>>, payload: Json<TrafficGenData>) -> Response {

@@ -29,7 +29,7 @@ use macaddr::MacAddr;
 use rbfrt::error::RBFRTError;
 use rbfrt::util::port_manager::{AutoNegotiation, FEC, Loopback, Port, Speed};
 use rbfrt::util::PortManager;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, watch};
 use core::statistics::TimeStatistic;
 use core::traffic_gen_core::types::TrafficGenData;
 
@@ -71,6 +71,8 @@ pub struct AppState {
     pub(crate) collected_statistics: Mutex<Vec<Statistics>>,
     pub(crate) collected_time_statistics: Mutex<Vec<TimeStatistic>>, 
     pub(crate) multiple_traffic_generators: Mutex<Vec<TrafficGenData>>,
+    // Added abort sender for test cancellation
+    pub(crate) abort_sender: Mutex<Option<watch::Sender<()>>>,
 }
 
 async fn configure_ports(switch: &mut SwitchConnection, pm: &PortManager, config: &Config, recirculation_ports: &Vec<u32>, port_mapping: &mut HashMap<u32, PortMapping>) -> Result<(), RBFRTError> {
@@ -228,6 +230,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         collected_statistics: Mutex::new(Vec::new()),
         collected_time_statistics: Mutex::new(Vec::new()),
         multiple_traffic_generators: Mutex::new(Vec::new()),
+        // Added abort sender for test cancellation
+        abort_sender: Mutex::new(None),
     });
 
     state.frame_size_monitor.lock().await.configure(&state.switch).await?;
