@@ -6,6 +6,7 @@ import StatView from "../components/StatView";
 import Loader from "../components/Loader";
 import {
   GenerationMode,
+  TestMode,
   Statistics as StatInterface,
   StatisticsObject,
   Stream,
@@ -85,6 +86,10 @@ const Home = () => {
     trafficGen: null,
   });
 
+  const [test_mode, set_test_mode] = useState(
+    parseInt(localStorage.getItem("test-mode") || String(TestMode.NONE))
+  );
+
   useEffect(() => {
     refresh();
 
@@ -147,53 +152,49 @@ const Home = () => {
         if (mode != GenerationMode.MPPS && overall_rate > 100) {
           alert("Sum of stream rates > 100 Gbps!");
         } else {
-          await post({
-            route: "/trafficgen",
-            body: {
-              streams: streams,
-              stream_settings: stream_settings,
-              port_tx_rx_mapping: port_tx_rx_mapping,
-              mode: mode,
-            },
-          });
-
+          if (test_mode === TestMode.SINGLE) {
+            await post({
+              route: "/trafficgen",
+              body: {
+                streams: streams,
+                stream_settings: stream_settings,
+                port_tx_rx_mapping: port_tx_rx_mapping,
+                mode: mode,
+              },
+            });
+          } else if (test_mode === TestMode.MULTI) {
+            const traffic_generations = [
+              {
+                streams: streams,
+                stream_settings: stream_settings,
+                port_tx_rx_mapping: port_tx_rx_mapping,
+                mode: mode,
+                duration: 6,
+              },
+              {
+                streams: streams,
+                stream_settings: stream_settings,
+                port_tx_rx_mapping: port_tx_rx_mapping,
+                mode: mode,
+                duration: 6,
+              },
+              {
+                streams: streams,
+                stream_settings: stream_settings,
+                port_tx_rx_mapping: port_tx_rx_mapping,
+                mode: mode,
+                duration: 4,
+              },
+            ];
+            await post({
+              route: "/multiple_trafficgen",
+              body: traffic_generations,
+            });
+          }
           set_running(true);
         }
       }
     }
-    set_overlay(false);
-  };
-
-  // Multiple traffic generation POST request
-  const onTest = async () => {
-    const traffic_generations = [
-      {
-        streams: streams,
-        stream_settings: stream_settings,
-        port_tx_rx_mapping: port_tx_rx_mapping,
-        mode: mode,
-        duration: 6,
-      },
-      {
-        streams: streams,
-        stream_settings: stream_settings,
-        port_tx_rx_mapping: port_tx_rx_mapping,
-        mode: mode,
-        duration: 6,
-      },
-      {
-        streams: streams,
-        stream_settings: stream_settings,
-        port_tx_rx_mapping: port_tx_rx_mapping,
-        mode: mode,
-        duration: 4,
-      },
-    ];
-    set_overlay(true);
-    await post({
-      route: "/multiple_trafficgen",
-      body: traffic_generations,
-    });
     set_overlay(false);
   };
 
@@ -306,9 +307,6 @@ const Home = () => {
                   <div>
                     <Button type={"submit"} className="mb-1" variant="primary">
                       <i className="bi bi-play-circle-fill" /> Start{" "}
-                    </Button>{" "}
-                    <Button onClick={onTest} className="mb-1" variant="primary">
-                      <i className="bi bi-play-circle-fill" /> Test{" "}
                     </Button>{" "}
                     <Button
                       onClick={() => {

@@ -47,7 +47,7 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
 
             match duration {
                 Some(duration) => {
-                    info!("Starting test {} with duration {:?} seconds", i + 1, duration);
+                    info!("Starting test Nr. {} with duration {:?} seconds", i + 1, duration);
                 }
                 None => {
                     info!("Starting single test with no duration");

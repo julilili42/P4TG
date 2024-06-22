@@ -172,6 +172,13 @@ export enum GenerationMode {
   POISSON = 3,
   ANALYZE = 4,
 }
+
+export enum TestMode {
+  NONE = 0,
+  SINGLE = 0,
+  MULTI = 1,
+}
+
 export interface Stream {
   stream_id: number;
   frame_size: number;

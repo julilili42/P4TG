@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Col, Row, Tab, Tabs, Form } from "react-bootstrap";
 import Settings from "../sites/Settings";
 import translate from "./translation/Translate";
+import { TestMode } from "../common/Interfaces";
 
 interface Tab {
   eventKey: string;
@@ -38,7 +39,9 @@ const TestSettings = () => {
 
   const [key, setKey] = useState("home");
   const [totalDuration, setTotalDuration] = useState(0);
-  const [currentMode, setCurrentMode] = useState(0);
+  const [currentMode, setCurrentMode] = useState(
+    parseInt(localStorage.getItem("test-mode") || String(TestMode.NONE))
+  );
 
   useEffect(() => {
     let total = 0;
@@ -87,6 +90,7 @@ const TestSettings = () => {
 
   const handleModeChange = (event: any) => {
     const value = Number(event.target.value);
+    localStorage.setItem("test-mode", String(value));
     setCurrentMode(value);
   };
 
