@@ -62,7 +62,7 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
                 return;
             }
 
-            if let Err(_) = monitor_test_duration(state_clone.clone(), duration, i, &mut abort_rx).await {
+            if monitor_test_duration(state_clone.clone(), duration, i, &mut abort_rx).await.is_err() {
                 info!("Test {} was aborted", i + 1);
                 break;
             }
@@ -89,16 +89,6 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
     });
 
     StatusCode::OK.into_response()
-}
-
-
-
-
-/// Method called on GET /multiple_trafficgen
-/// Returns a list of currently configured traffic generations
-pub async fn multiple_traffic_gen(State(state): State<Arc<AppState>>) -> Response {
-    let configs = state.multiple_traffic_generators.lock().await;
-    (StatusCode::OK, Json(configs.clone())).into_response()
 }
 
 
@@ -131,64 +121,59 @@ async fn monitor_test_duration(
     test_index: usize,
     abort_rx: &mut watch::Receiver<()>,
 ) -> Result<(), ()> {
-    match duration {
-        Some(d) => {
-            let start_time = SystemTime::now();
-            let end_time = start_time + Duration::from_secs(d);
+    if let Some(d) = duration {
+        let start_time = SystemTime::now();
+        let duration = Duration::from_secs(d);
 
-            loop {
-                let now = SystemTime::now();
-                if now >= end_time {
-                    break;
-                }
-                {
-                    let experiment = state.experiment.lock().await;
-                    if !experiment.running {
-                        info!("Skipping test {}", test_index + 1);
-                        break;
-                    }
-                }
-                let remaining_duration = end_time.duration_since(now).unwrap_or_default();
-                // Überwachung der verbleibenden Dauer oder des Abbruchsignals
-                tokio::select! {
-                    _ = tokio::time::sleep(remaining_duration.min(Duration::from_millis(100))) => {},
-                    _ = abort_rx.changed() => {
-                        return Err(());
-                    }
+        loop {
+            let elapsed = start_time.elapsed().unwrap_or_default();
+            if elapsed >= duration {
+                break;
+            }
+
+            let remaining_duration = duration - elapsed;
+
+            tokio::select! {
+                _ = tokio::time::sleep(remaining_duration.min(Duration::from_millis(100))) => {},
+                _ = abort_rx.changed() => {
+                    return Err(());
                 }
             }
-        },
-        None => {
-            loop {
-                {
-                    let experiment = state.experiment.lock().await;
-                    if !experiment.running {
-                        info!("Ending single test");
-                        break;
-                    }
+
+            if !state.experiment.lock().await.running {
+                info!("Skipping test {}", test_index + 1);
+                break;
+            }
+        }
+    } else {
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(100)) => {},
+                _ = abort_rx.changed() => {
+                    return Err(());
                 }
-                // Überwachung der regelmäßigen Intervalle oder des Abbruchsignals
-                tokio::select! {
-                    _ = tokio::time::sleep(Duration::from_millis(100)) => {},
-                    _ = abort_rx.changed() => {
-                        return Err(());
-                    }
-                }
+            }
+
+            if !state.experiment.lock().await.running {
+                info!("Ending single test");
+                break;
             }
         }
     }
+
     Ok(())
 }
 
+
 // Reset of statistics and traffic_generators in Appstate, start of experiment
 async fn reset_and_start_experiment(state_clone: Arc<AppState>, payload_clone: Vec<TrafficGenData>) {
-    let mut collected_statistics = state_clone.collected_statistics.lock().await;
+    let mut collected_statistics = state_clone.multi_test_state.collected_statistics.lock().await;
     collected_statistics.clear();
 
-    let mut collected_time_statistics = state_clone.collected_time_statistics.lock().await; 
+    let mut collected_time_statistics = state_clone.multi_test_state.collected_time_statistics.lock().await; 
     collected_time_statistics.clear();
 
-    let mut multiple_traffic_generators = state_clone.multiple_traffic_generators.lock().await;
+    let mut multiple_traffic_generators = state_clone.multi_test_state.multiple_traffic_generators.lock().await;
     multiple_traffic_generators.clear(); 
     multiple_traffic_generators.extend(payload_clone.clone());
 }
@@ -200,7 +185,7 @@ async fn save_statistics(state_clone: Arc<AppState>, i: usize) -> Result<(), Str
     if let Ok(mut stats) = parse_response::<Statistics>(stats_response).await {
         // Storing statistics in AppState
         stats.previous_statistics = None;
-        state_clone.collected_statistics.lock().await.push(stats.clone());
+        state_clone.multi_test_state.collected_statistics.lock().await.push(stats.clone());
     } else {
         return Err(format!("Failed to retrieve statistics for test {}", i + 1));
     }
@@ -210,7 +195,7 @@ async fn save_statistics(state_clone: Arc<AppState>, i: usize) -> Result<(), Str
     if let Ok(mut time_stats) = parse_response::<TimeStatistic>(time_stats_response).await {
         // Storing time_statistics in AppState
         time_stats.previous_time_statistics = None;
-        state_clone.collected_time_statistics.lock().await.push(time_stats.clone());
+        state_clone.multi_test_state.collected_time_statistics.lock().await.push(time_stats.clone());
     } else {
         return Err(format!("Failed to retrieve time statistics for test {}", i + 1));
     }
@@ -223,7 +208,7 @@ async fn create_and_store_abort_sender(state: Arc<AppState>) -> watch::Receiver<
     let (abort_tx, abort_rx) = watch::channel(());
 
     {
-        let mut abort_sender = state.abort_sender.lock().await;
+        let mut abort_sender = state.multi_test_state.abort_sender.lock().await;
         *abort_sender = Some(abort_tx);
     }
 
@@ -234,7 +219,7 @@ async fn create_and_store_abort_sender(state: Arc<AppState>) -> watch::Receiver<
 
 // Funktion zum Abbrechen des aktuellen Tests
 async fn abort_current_test(state: Arc<AppState>) {
-    let abort_sender = state.abort_sender.lock().await.clone();
+    let abort_sender = state.multi_test_state.abort_sender.lock().await.clone();
     
     if let Some(abort_tx) = abort_sender {
         // Send the abort signal

@@ -51,6 +51,7 @@ lazy_static! {
         ],
         port_tx_rx_mapping: HashMap::from([(128, 136)]),
         duration: None,
+        all_test: None,
     };
 
     pub static ref EXAMPLE_GET_2: TrafficGenData = TrafficGenData {
@@ -100,6 +101,7 @@ lazy_static! {
         ],
         port_tx_rx_mapping: HashMap::from([(128, 136)]),
         duration: None,
+        all_test: None,
     };
 
 
@@ -165,6 +167,7 @@ lazy_static! {
         ],
         port_tx_rx_mapping: HashMap::from([(128, 136)]),
         duration: None,
+        all_test: None,
 };
 
     pub static ref EXAMPLE_POST_2_REQUEST: TrafficGenData = TrafficGenData {
@@ -213,6 +216,7 @@ lazy_static! {
         ],
         port_tx_rx_mapping: HashMap::from([(128, 136)]),
         duration: None,
+        all_test: None,
     };
 
     pub static ref EXAMPLE_POST_2_RESPONSE: Vec<Stream> = vec![Stream {
@@ -271,6 +275,7 @@ lazy_static! {
             }
         ],
         duration: None,
+        all_test: None,
     };
 }
 

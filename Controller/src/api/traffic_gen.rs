@@ -25,6 +25,7 @@ use axum::response::{IntoResponse, Json, Response};
 use log::info;
 use serde::Serialize;
 use crate::api::multiple_traffic_gen::configure_multiple_traffic_gen;
+use std::collections::BTreeMap;
 
 use crate::api::server::Error;
 use crate::AppState;
@@ -33,7 +34,7 @@ use crate::api::docs::traffic_gen::{EXAMPLE_GET_1, EXAMPLE_GET_2, EXAMPLE_POST_1
 use crate::core::traffic_gen_core::types::*;
 
 /// Method called on GET /trafficgen
-/// Returns the currently configured traffic generation
+/// Returns the currently configured traffic generation(s) (see `all_test` field in `TrafficGenData`)
 #[utoipa::path(
         get,
         path = "/api/trafficgen",
@@ -50,19 +51,33 @@ use crate::core::traffic_gen_core::types::*;
 )]
 pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
     let tg = &state.traffic_generator.lock().await;
-
+    let all_test_list = state.multi_test_state.multiple_traffic_generators.lock().await;
 
 
     if !tg.running {
         (StatusCode::ACCEPTED, Json(EmptyResponse{message: "Not running.".to_string()})).into_response()
     }
     else {
+
+        let all_test_value = if all_test_list.len() > 1 {
+            let mut btree_map = BTreeMap::new();
+            for (index, test_data) in all_test_list.iter().enumerate() {
+                btree_map.insert(index as u32, test_data.clone());
+            }
+            Some(btree_map)
+        } else {
+            None
+        };
+
+
+
         let tg_data = TrafficGenData {
             mode: tg.mode,
             stream_settings: tg.stream_settings.clone(),
             streams: tg.streams.clone(),
             port_tx_rx_mapping: tg.port_mapping.clone(),
             duration: None,
+            all_test: all_test_value
         };
 
         (StatusCode::OK, Json(tg_data)).into_response()

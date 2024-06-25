@@ -77,7 +77,7 @@ const DownloadPdf = ({
     }[]
   >([]);
   const [streams, set_streams] = useState<Stream[]>(
-    JSON.parse(localStorage.getItem("streams") ?? "") ?? []
+    JSON.parse(localStorage.getItem("streams") ?? "[]")
   );
   const [mode, set_mode] = useState(
     parseInt(localStorage.getItem("gen-mode") || String(GenerationMode.NONE))

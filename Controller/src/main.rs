@@ -54,6 +54,15 @@ pub struct Experiment {
     running: bool
 }
 
+/// Stores statistics and configurations, as well as an abort signal for multiple tests
+pub struct MultiTest {
+    pub(crate) collected_statistics: Mutex<Vec<Statistics>>,
+    pub(crate) collected_time_statistics: Mutex<Vec<TimeStatistic>>,
+    pub(crate) multiple_traffic_generators: Mutex<Vec<TrafficGenData>>,
+    pub(crate) abort_sender: Mutex<Option<watch::Sender<()>>>,
+}
+
+
 /// App state that is used between threads
 pub struct AppState {
     pub(crate) frame_size_monitor: Mutex<FrameSizeMonitor>,
@@ -67,12 +76,7 @@ pub struct AppState {
     pub(crate) sample_mode: bool,
     pub(crate) config: Mutex<Config>,
     pub(crate) arp_handler: Arp,
-    // Added for multiple traffic generators
-    pub(crate) collected_statistics: Mutex<Vec<Statistics>>,
-    pub(crate) collected_time_statistics: Mutex<Vec<TimeStatistic>>, 
-    pub(crate) multiple_traffic_generators: Mutex<Vec<TrafficGenData>>,
-    // Added abort sender for test cancellation
-    pub(crate) abort_sender: Mutex<Option<watch::Sender<()>>>,
+    pub(crate) multi_test_state: MultiTest, 
 }
 
 async fn configure_ports(switch: &mut SwitchConnection, pm: &PortManager, config: &Config, recirculation_ports: &Vec<u32>, port_mapping: &mut HashMap<u32, PortMapping>) -> Result<(), RBFRTError> {
@@ -226,12 +230,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         experiment: Mutex::new(Experiment { start: std::time::SystemTime::now(), running: false }),
         config: Mutex::new(config),
         arp_handler,
-        // Added for multiple traffic generators
+        multi_test_state: MultiTest {
         collected_statistics: Mutex::new(Vec::new()),
         collected_time_statistics: Mutex::new(Vec::new()),
         multiple_traffic_generators: Mutex::new(Vec::new()),
-        // Added abort sender for test cancellation
         abort_sender: Mutex::new(None),
+        },
     });
 
     state.frame_size_monitor.lock().await.configure(&state.switch).await?;

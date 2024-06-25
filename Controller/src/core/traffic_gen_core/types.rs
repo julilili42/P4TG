@@ -17,7 +17,7 @@
  * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
  */
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::net::Ipv4Addr;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -115,22 +115,6 @@ pub struct MPLSHeader {
     pub ttl: u32
 }
 
-/// Holds test informations
-#[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
-pub struct TestInfo {
-    pub current_test_number: usize,
-    pub total_tests: usize,
-}
-
-impl Default for TestInfo {
-    fn default() -> Self {
-        TestInfo {
-            current_test_number: 0,
-            total_tests: 0,
-        }
-    }
-}
-
 /// Represents the body of the GET / POST endpoints of /trafficgen
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]
 pub struct TrafficGenData {
@@ -144,7 +128,11 @@ pub struct TrafficGenData {
     /// Traffic send on port TX are expected to be received on port RX.
     pub(crate) port_tx_rx_mapping: HashMap<u32, u32>,
     /// Optional duration for each traffic generation
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) duration: Option<u64>,
+    /// Optional all traffic configurations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) all_test: Option<BTreeMap<u32, TrafficGenData>>
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, ToSchema)]

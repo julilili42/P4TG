@@ -86,7 +86,7 @@ pub async fn statistics(State(state): State<Arc<AppState>>) -> Response {
     let frame_size_monitor = &state.frame_size_monitor;
     let frame_type_monitor = &state.frame_type_monitor;
     let rate_monitor = &state.rate_monitor;
-    let collected_statistics = state.collected_statistics.lock().await.clone();
+    let collected_statistics = state.multi_test_state.collected_statistics.lock().await.clone();
 
     // Single test no previous statistics
     let mut previous_statistics_map: Option<BTreeMap<u32, Statistics>> = None;
@@ -210,7 +210,7 @@ pub struct Params {
 pub async fn time_statistics(State(state): State<Arc<AppState>>, Query(params): Query<Params>) -> Response {
     let rate_monitor = &state.rate_monitor;
     let stats = rate_monitor.lock().await.time_statistics.clone();
-    let collected_time_statistics = state.collected_time_statistics.lock().await.clone();
+    let collected_time_statistics = state.multi_test_state.collected_time_statistics.lock().await.clone();
 
     // Convert collected_statistics into BTreeMap
     let mut previous_time_statistics_map: BTreeMap<u32, TimeStatistic> = BTreeMap::new();

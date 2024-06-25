@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { Button, Col, Form, Row, Tab, Tabs, Alert } from "react-bootstrap";
+import {
+  Button,
+  Col,
+  Form,
+  Row,
+  Tab,
+  Tabs,
+  OverlayTrigger,
+  Tooltip,
+} from "react-bootstrap";
 import { del, get, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
 import StatView from "../components/StatView";
@@ -59,10 +68,10 @@ const Home = () => {
   const [imageData, setImageData] = useState<string[]>([]);
 
   const [streams, set_streams] = useState<Stream[]>(
-    JSON.parse(localStorage.getItem("streams") ?? "") ?? []
+    JSON.parse(localStorage.getItem("streams") ?? "[]")
   );
   const [stream_settings, set_stream_settings] = useState<StreamSettings[]>(
-    JSON.parse(localStorage.getItem("streamSettings") ?? "") ?? []
+    JSON.parse(localStorage.getItem("streamSettings") ?? "[]")
   );
   const [mode, set_mode] = useState(
     parseInt(localStorage.getItem("gen-mode") || String(GenerationMode.NONE))
@@ -70,7 +79,7 @@ const Home = () => {
 
   const [port_tx_rx_mapping, set_port_tx_rx_mapping] = useState<{
     [name: number]: number;
-  }>(JSON.parse(localStorage.getItem("port_tx_rx_mapping") ?? "") ?? {});
+  }>(JSON.parse(localStorage.getItem("port_tx_rx_mapping") ?? "{}"));
   const [statistics, set_statistics] =
     useState<StatInterface>(StatisticsObject);
   const [time_statistics, set_time_statistics] =
@@ -86,6 +95,10 @@ const Home = () => {
     trafficGen: null,
   });
 
+  const [currentTestNumber, setCurrentTestNumber] = useState<number>(1);
+  const [totalTestsNumber, setTotalTestsNumber] = useState<number>(1);
+  const [currentTestDuration, setCurrentTestDuration] = useState<number>(0);
+
   const [test_mode, set_test_mode] = useState(
     parseInt(localStorage.getItem("test-mode") || String(TestMode.NONE))
   );
@@ -95,6 +108,10 @@ const Home = () => {
 
     const interval_stats = setInterval(
       async () => await Promise.all([loadStatistics()]),
+      500
+    );
+    const test_number = setInterval(
+      async () => await Promise.all([loadTestInfo()]),
       500
     );
     const interval_loadgen = setInterval(
@@ -108,6 +125,7 @@ const Home = () => {
 
     return () => {
       clearInterval(interval_stats);
+      clearInterval(test_number);
       clearInterval(interval_loadgen);
       clearInterval(inverval_timestats);
     };
@@ -130,6 +148,7 @@ const Home = () => {
   const refresh = async () => {
     await loadGen();
     await loadStatistics();
+    await loadTestInfo();
     set_loaded(true);
   };
 
@@ -169,7 +188,7 @@ const Home = () => {
                 stream_settings: stream_settings,
                 port_tx_rx_mapping: port_tx_rx_mapping,
                 mode: mode,
-                duration: 6,
+                duration: 10,
               },
               {
                 streams: streams,
@@ -190,12 +209,41 @@ const Home = () => {
               route: "/multiple_trafficgen",
               body: traffic_generations,
             });
+            setTotalTestsNumber(traffic_generations.length);
           }
           set_running(true);
         }
       }
     }
     set_overlay(false);
+  };
+
+  const loadTestInfo = async () => {
+    let stats = await get({ route: "/statistics" });
+    let tg = await get({ route: "/trafficgen" });
+
+    if (tg != undefined && tg.status === 200) {
+      const allTests = tg.data.all_test ?? {};
+      const newTotalTestsNumber = Object.keys(allTests).length;
+      setTotalTestsNumber(newTotalTestsNumber);
+
+      if (stats != undefined && stats.status === 200) {
+        const previousStats = stats.data.previous_statistics ?? {};
+        const testNumbersArray = Object.keys(previousStats).map(Number);
+
+        let currentTestNumber =
+          testNumbersArray.length > 0 ? Math.max(...testNumbersArray) + 1 : 1;
+
+        if (currentTestNumber > newTotalTestsNumber) {
+          currentTestNumber = newTotalTestsNumber;
+        }
+
+        setCurrentTestNumber(currentTestNumber);
+
+        const newTestDuration = allTests[currentTestNumber - 1]?.duration || 0;
+        setCurrentTestDuration(newTestDuration);
+      }
+    }
   };
 
   const loadStatistics = async () => {
@@ -343,17 +391,38 @@ const Home = () => {
           </Col>
         </Row>
       </form>
-
-      <Form>
-        <Form.Check // prettier-ignore
-          type="switch"
-          id="custom-switch"
-          checked={visual}
-          onClick={() => set_visual(!visual)}
-          label={translate("Visualization", currentLanguage)}
-        />
-      </Form>
-
+      <Row className="d-flex align-items-center">
+        <Col className={"col-auto"}>
+          <Form>
+            <Form.Check // prettier-ignore
+              type="switch"
+              id="custom-switch"
+              checked={visual}
+              onClick={() => set_visual(!visual)}
+              label={translate("Visualization", currentLanguage)}
+            />
+          </Form>
+        </Col>
+        {running && test_mode === TestMode.MULTI ? (
+          <Col className={"col-auto"}>
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip id="test-info-tooltip">
+                  Test {currentTestNumber} of {totalTestsNumber}
+                  <br />
+                  Duration {currentTestDuration} seconds
+                </Tooltip>
+              }
+            >
+              <i className="bi bi-info-circle" style={{ cursor: "pointer" }} />
+            </OverlayTrigger>{" "}
+            Test info
+          </Col>
+        ) : (
+          <></>
+        )}
+      </Row>
       <Tabs
         defaultActiveKey="current"
         className="mt-3"

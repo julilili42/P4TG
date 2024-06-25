@@ -32,7 +32,6 @@ mod docs;
 
 mod multiple_traffic_gen;
 pub use multiple_traffic_gen::configure_multiple_traffic_gen;
-pub use multiple_traffic_gen::multiple_traffic_gen;
 
 pub use online::online;
 pub use statistics::statistics;
