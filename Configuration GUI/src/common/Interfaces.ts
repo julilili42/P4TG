@@ -174,7 +174,6 @@ export enum GenerationMode {
 }
 
 export enum TestMode {
-  NONE = 0,
   SINGLE = 0,
   MULTI = 1,
 }

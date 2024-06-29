@@ -23,7 +23,7 @@ use tokio::sync::watch;
 #[debug_handler]
 pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, Json(payload): Json<Vec<TrafficGenData>>) -> Response {
     if !validate_payload(&payload) {
-        return (StatusCode::BAD_REQUEST, Json(Error::new("Each TrafficGenData must have a valid duration."))).into_response();
+        return (StatusCode::BAD_REQUEST, Json(Error::new("Each Test must have a valid duration."))).into_response();
     }
 
     // Abort any currently running test

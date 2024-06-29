@@ -27,6 +27,7 @@ import {
   DefaultStream,
   DefaultStreamSettings,
   GenerationMode,
+  TestMode,
   Stream,
   StreamSettings,
   TrafficGenData,
@@ -54,9 +55,11 @@ export const StyledCol = styled.td`
 const Settings = ({
   onTestChange,
   showDuration,
+  TestNumber,
 }: {
   onTestChange?: (duration: number) => void;
   showDuration?: boolean;
+  TestNumber?: number;
 }) => {
   const [ports, set_ports] = useState<
     {
@@ -85,6 +88,24 @@ const Settings = ({
   const [mode, set_mode] = useState(
     parseInt(localStorage.getItem("gen-mode") || String(GenerationMode.NONE))
   );
+
+  const [streamsList, set_streamsList] = useState<{ [key: number]: Stream[] }>(
+    JSON.parse(localStorage.getItem("streamsList") ?? "{}")
+  );
+  const [streamSettingsList, set_streamSettingsList] = useState<{
+    [key: number]: StreamSettings[];
+  }>(JSON.parse(localStorage.getItem("streamSettingsList") ?? "{}"));
+  const [portTxRxMappingList, set_portTxRxMappingList] = useState<{
+    [key: number]: { [name: number]: number };
+  }>(JSON.parse(localStorage.getItem("port_tx_rx_mapping_list") ?? "{}"));
+  const [modeList, set_modeList] = useState<{ [key: number]: number }>(
+    JSON.parse(localStorage.getItem("gen-mode-list") ?? "{}")
+  );
+
+  const [testMode, setTestMode] = useState(
+    parseInt(localStorage.getItem("test-mode") || "0")
+  );
+
   const [loaded, set_loaded] = useState(false);
   const ref = useRef();
 
@@ -143,12 +164,84 @@ const Settings = ({
     };
   }, [streams]);
 
+  const addToObjectInLocalStorage = (
+    key: string,
+    testNumber: number,
+    value: any
+  ) => {
+    let existingObject;
+    try {
+      existingObject = JSON.parse(localStorage.getItem(key)) || {};
+    } catch (e) {
+      existingObject = {};
+    }
+    existingObject[testNumber] = value;
+    localStorage.setItem(key, JSON.stringify(existingObject));
+  };
+
+  const getNewTestNumber = () => {
+    if (TestNumber) {
+      return TestNumber;
+    }
+
+    const streamsList = JSON.parse(localStorage.getItem("streamsList") || "{}");
+    const keys = Object.keys(streamsList).map(Number);
+    const maxKey = keys.length > 0 ? Math.max(...keys) : 0;
+    return maxKey + 1;
+  };
+
+  const saveList = () => {
+    if (testMode === TestMode.SINGLE) {
+      // Reset of all lists if single test mode is activated
+      localStorage.setItem("streamsList", JSON.stringify({}));
+      localStorage.setItem("streamSettingsList", JSON.stringify({}));
+      localStorage.setItem("port_tx_rx_mapping_list", JSON.stringify({}));
+      localStorage.setItem("gen-mode-list", JSON.stringify({}));
+
+      // List of one element for the single test
+      addToObjectInLocalStorage("streamsList", 1, streams);
+      addToObjectInLocalStorage("streamSettingsList", 1, stream_settings);
+      addToObjectInLocalStorage(
+        "port_tx_rx_mapping_list",
+        1,
+        port_tx_rx_mapping
+      );
+      addToObjectInLocalStorage("gen-mode-list", 1, mode);
+    } else {
+      // Test number for the new test
+      const testNumber = getNewTestNumber();
+
+      // Save settings in local storage
+      addToObjectInLocalStorage("streamsList", testNumber, streams);
+      addToObjectInLocalStorage(
+        "streamSettingsList",
+        testNumber,
+        stream_settings
+      );
+      addToObjectInLocalStorage(
+        "port_tx_rx_mapping_list",
+        testNumber,
+        port_tx_rx_mapping
+      );
+      addToObjectInLocalStorage("gen-mode-list", testNumber, mode);
+    }
+  };
+
+  const resetList = () => {
+    localStorage.clear();
+
+    set_streamsList({ "1": [] });
+    set_streamSettingsList({ "1": [] });
+    set_modeList({ "1": GenerationMode.NONE });
+    set_portTxRxMappingList({ "1": {} });
+
+    alert(translate("Reset complete.", currentLanguage));
+  };
+
   const save = () => {
     localStorage.setItem("streams", JSON.stringify(streams));
     localStorage.setItem("gen-mode", String(mode));
-
     localStorage.setItem("streamSettings", JSON.stringify(stream_settings));
-
     localStorage.setItem(
       "port_tx_rx_mapping",
       JSON.stringify(port_tx_rx_mapping)
@@ -575,10 +668,24 @@ const Settings = ({
 
       <Row>
         <Col>
-          <Button onClick={save} disabled={running} variant="primary">
+          <Button
+            onClick={() => {
+              save();
+              saveList();
+            }}
+            disabled={running}
+            variant="primary"
+          >
             <i className="bi bi-check" /> {translate("Save", currentLanguage)}
           </Button>{" "}
-          <Button onClick={reset} disabled={running} variant="danger">
+          <Button
+            onClick={() => {
+              reset();
+              resetList();
+            }}
+            disabled={running}
+            variant="danger"
+          >
             <i className="bi bi-x-octagon-fill" />{" "}
             {translate("Reset", currentLanguage)}
           </Button>

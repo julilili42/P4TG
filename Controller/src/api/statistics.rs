@@ -92,7 +92,7 @@ pub async fn statistics(State(state): State<Arc<AppState>>) -> Response {
     let mut previous_statistics_map: Option<BTreeMap<u32, Statistics>> = None;
 
     // Multiple statistics
-    if collected_statistics.len() > 0 {
+    if !collected_statistics.is_empty() {
         // Convert collected_statistics into BTreeMap
         let mut map: BTreeMap<u32, Statistics> = BTreeMap::new();
         for (index, stats) in collected_statistics.iter().enumerate() {

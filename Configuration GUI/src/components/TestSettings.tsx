@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button, Col, Row, Tab, Tabs, Form } from "react-bootstrap";
-import Settings from "../sites/Settings";
+import { Button, Col, Row, Tab, Tabs, Form, Table } from "react-bootstrap";
+import Settings, { StyledCol } from "../sites/Settings";
 import translate from "./translation/Translate";
 import { TestMode } from "../common/Interfaces";
+import { get } from "../common/API";
+import StreamSettingsList from "./settings/StreamSettingsList";
 
 interface Tab {
   eventKey: string;
@@ -13,6 +15,46 @@ interface Tab {
 }
 
 const TestSettings = () => {
+  const [streamsList, setStreamsList] = useState<{ [key: number]: any }>({});
+  const [streamSettingsList, setStreamSettingsList] = useState<{
+    [key: number]: any;
+  }>({});
+  const [portTxRxMappingList, setPortTxRxMappingList] = useState<{
+    [key: number]: any;
+  }>({});
+  const [modeList, setModeList] = useState<{ [key: number]: any }>({});
+
+  const [ports, set_ports] = useState<
+    {
+      pid: number;
+      port: number;
+      channel: number;
+      loopback: string;
+      status: boolean;
+    }[]
+  >([]);
+
+  const loadPorts = async () => {
+    let stats = await get({ route: "/ports" });
+
+    if (stats.status === 200) {
+      set_ports(stats.data);
+    }
+  };
+
+  useEffect(() => {
+    setStreamsList(JSON.parse(localStorage.getItem("streamsList") || "{}"));
+    setStreamSettingsList(
+      JSON.parse(localStorage.getItem("streamSettingsList") || "{}")
+    );
+    setPortTxRxMappingList(
+      JSON.parse(localStorage.getItem("port_tx_rx_mapping_list") || "{}")
+    );
+    setModeList(JSON.parse(localStorage.getItem("gen-mode-list") || "{}"));
+
+    loadPorts();
+  }, []);
+
   const [tabs, setTabs] = useState<Tab[]>([
     {
       eventKey: "home",
@@ -22,6 +64,7 @@ const TestSettings = () => {
           <Settings
             onTestChange={(duration) => handleDurationChange(duration, "home")}
             showDuration={true}
+            TestNumber={1}
           />
         </div>
       ),
@@ -40,7 +83,7 @@ const TestSettings = () => {
   const [key, setKey] = useState("home");
   const [totalDuration, setTotalDuration] = useState(0);
   const [currentMode, setCurrentMode] = useState(
-    parseInt(localStorage.getItem("test-mode") || String(TestMode.NONE))
+    parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
   );
 
   useEffect(() => {
@@ -114,22 +157,102 @@ const TestSettings = () => {
 
   const addTab = () => {
     const newTabKey = `tab-${new Date().getTime()}`;
+    const newTabNumber = tabs.length;
+
+    /* const newStreams = streamsList[newTabNumber] || [];
+    const newStreamSettings = streamSettingsList[newTabNumber] || [];
+    const newPortTxRxMapping = portTxRxMappingList[newTabNumber] || {};
+    const running = false; */
+
     const newTab = {
       eventKey: newTabKey,
-      title: `Test ${tabs.length}`,
+      title: `Test ${newTabNumber}`,
       content: (
         <div style={{ marginTop: "15px" }}>
           <Settings
+            TestNumber={newTabNumber}
             onTestChange={(duration) =>
               handleDurationChange(duration, newTabKey)
             }
             showDuration={true}
           />
+
+          {/* <Table
+            striped
+            bordered
+            hover
+            size="sm"
+            className={"mt-3 mb-3 text-center"}
+          >
+            <thead className={"table-dark"}>
+              <tr>
+                <th>TX Port</th>
+                <th>RX Port</th>
+                {newStreams.map((v: any, i: any) => {
+                  return <th key={i}>Stream {v.app_id}</th>;
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {ports.map((v, i) => {
+                if (v.loopback == "BF_LPBK_NONE") {
+                  return (
+                    <tr key={i}>
+                      <StyledCol>
+                        {v.port} ({v.pid})
+                      </StyledCol>
+                      <StyledCol>
+                        <Form.Select
+                          disabled={running || !v.status}
+                          required
+                          defaultValue={newPortTxRxMapping[v.pid] || -1}
+                          onChange={(event: any) => {
+                            let current = { ...newPortTxRxMapping };
+
+                            if (parseInt(event.target.value) == -1) {
+                              delete current[v.pid];
+                            } else {
+                              current[v.pid] = parseInt(event.target.value);
+                            }
+
+                            setPortTxRxMappingList((prev) => ({
+                              ...prev,
+                              [newTabNumber]: current,
+                            }));
+                          }}
+                        >
+                          <option value={-1}>
+                            {translate("Select RX Port", currentLanguage)}
+                          </option>
+                          {ports.map((v, i) => {
+                            if (v.loopback == "BF_LPBK_NONE") {
+                              return (
+                                <option key={i} value={v.pid}>
+                                  {v.port} ({v.pid})
+                                </option>
+                              );
+                            }
+                          })}
+                        </Form.Select>
+                      </StyledCol>
+                      <StreamSettingsList
+                        stream_settings={newStreamSettings}
+                        streams={newStreams}
+                        running={running}
+                        port={v}
+                      />
+                    </tr>
+                  );
+                }
+              })}
+            </tbody>
+          </Table> */}
         </div>
       ),
       duration: 0,
       titleEditable: false,
     };
+
     const newTabs = [...tabs];
     newTabs.splice(tabs.length - 1, 0, newTab);
     setTabs(newTabs);
@@ -140,12 +263,93 @@ const TestSettings = () => {
     if (eventKey !== "home") {
       const index = tabs.findIndex((tab) => tab.eventKey === eventKey);
       const newTabs = tabs.filter((tab) => tab.eventKey !== eventKey);
+      const tabNumber = index + 1;
 
+      // Update titles
       newTabs.forEach((tab, i) => {
         if (tab.title.startsWith("Test")) {
           tab.title = `Test ${i + 1}`;
         }
       });
+
+      const updateLocalStorage = (key: string, number: number) => {
+        const data = JSON.parse(localStorage.getItem(key) || "{}");
+        delete data[number];
+
+        // Rebuild the object with updated keys
+        const updatedData: any = {};
+        let newIndex = 1;
+        Object.keys(data).forEach((key) => {
+          if (parseInt(key) !== number) {
+            updatedData[newIndex] = data[key];
+            newIndex++;
+          }
+        });
+
+        localStorage.setItem(key, JSON.stringify(updatedData));
+      };
+
+      updateLocalStorage("streamsList", tabNumber);
+      updateLocalStorage("streamSettingsList", tabNumber);
+      updateLocalStorage("port_tx_rx_mapping_list", tabNumber);
+      updateLocalStorage("gen-mode-list", tabNumber);
+
+      setStreamsList((prev) => {
+        const newStreamsList = { ...prev };
+        delete newStreamsList[tabNumber];
+        const updatedStreamsList: any = {};
+        let newIndex = 1;
+        Object.keys(newStreamsList).forEach((key: any) => {
+          if (parseInt(key) !== tabNumber) {
+            updatedStreamsList[newIndex] = newStreamsList[key];
+            newIndex++;
+          }
+        });
+        return updatedStreamsList;
+      });
+
+      setStreamSettingsList((prev) => {
+        const newStreamSettingsList = { ...prev };
+        delete newStreamSettingsList[tabNumber];
+        const updatedStreamSettingsList: any = {};
+        let newIndex = 1;
+        Object.keys(newStreamSettingsList).forEach((key: any) => {
+          if (parseInt(key) !== tabNumber) {
+            updatedStreamSettingsList[newIndex] = newStreamSettingsList[key];
+            newIndex++;
+          }
+        });
+        return updatedStreamSettingsList;
+      });
+
+      setPortTxRxMappingList((prev) => {
+        const newPortTxRxMappingList = { ...prev };
+        delete newPortTxRxMappingList[tabNumber];
+        const updatedPortTxRxMappingList: any = {};
+        let newIndex = 1;
+        Object.keys(newPortTxRxMappingList).forEach((key: any) => {
+          if (parseInt(key) !== tabNumber) {
+            updatedPortTxRxMappingList[newIndex] = newPortTxRxMappingList[key];
+            newIndex++;
+          }
+        });
+        return updatedPortTxRxMappingList;
+      });
+
+      setModeList((prev) => {
+        const newModeList = { ...prev };
+        delete newModeList[tabNumber];
+        const updatedModeList: any = {};
+        let newIndex = 1;
+        Object.keys(newModeList).forEach((key: any) => {
+          if (parseInt(key) !== tabNumber) {
+            updatedModeList[newIndex] = newModeList[key];
+            newIndex++;
+          }
+        });
+        return updatedModeList;
+      });
+
       setTabs(newTabs);
 
       if (eventKey === key && newTabs.length >= 2) {

@@ -17,36 +17,48 @@
  * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
  */
 
-import {Stream, StreamSettings} from "../../common/Interfaces";
+import { Stream, StreamSettings } from "../../common/Interfaces";
 import StreamSettingsElement from "./StreamSettingsElement";
 import React from "react";
 
-const StreamSettingsList = ({stream_settings, streams, running, port}: {
-    stream_settings: StreamSettings[],
-    streams: Stream[],
-    running: boolean,
-    port: { pid: number, port: number, channel: number, loopback: string, status: boolean }
+const StreamSettingsList = ({
+  stream_settings,
+  streams,
+  running,
+  port,
+}: {
+  stream_settings: StreamSettings[];
+  streams: Stream[];
+  running: boolean;
+  port: {
+    pid: number;
+    port: number;
+    channel: number;
+    loopback: string;
+    status: boolean;
+  };
 }) => {
-    return <>
-        {stream_settings.map((s: StreamSettings, i: number) => {
-            let stream = null;
+  return (
+    <>
+      {stream_settings.map((s: StreamSettings, i: number) => {
+        const stream = streams.find(
+          (st: Stream) => st.stream_id === s.stream_id
+        );
 
-            streams.forEach((st: Stream) => {
-                if (st.stream_id == s.stream_id) {
-                    stream = st;
-                }
-            })
-
-            if (stream == null) {
-                console.log(s, streams)
-            }
-            if (s.port == port.pid && stream != null) {
-                return <StreamSettingsElement key={i} running={running || !port.status} stream_data={stream}
-                                              stream={s}/>
-            }
-
-        })}
+        if (s.port === port.pid && stream) {
+          return (
+            <StreamSettingsElement
+              key={i}
+              running={running || !port.status}
+              stream_data={stream}
+              stream={s}
+            />
+          );
+        }
+        return null;
+      })}
     </>
-}
+  );
+};
 
-export default StreamSettingsList
+export default StreamSettingsList;

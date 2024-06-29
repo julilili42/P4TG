@@ -25,7 +25,6 @@ import { AxiosInterceptor } from "./common/API";
 import styled from "styled-components";
 import ErrorView from "./components/ErrorView";
 import Navbar from "./components/Navbar";
-import Test from "./components/Test";
 
 import Home, { GitHub } from "./sites/Home";
 import Setup from "./sites/Setup";
@@ -38,6 +37,7 @@ import config from "./config";
 import { StreamSettings } from "./common/Interfaces";
 import { Stream } from "./common/Interfaces";
 import { validateStreams, validateStreamSettings } from "./common/Validators";
+import ListTestSettings from "./components/ListSettings/ListSettings";
 
 const App = () => {
   const [error, set_error] = useState(false);
@@ -132,8 +132,18 @@ const App = () => {
                       <Route path={"/home"} element={<Home />} />
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
-                      <Route path={"/tests"} element={<TestSettings />} />
-                      <Route path={"/testoutput"} element={<Test />} />
+                      <Route path={"/tests"} element={<ListTestSettings />} />
+
+                      <Route path={"/tests2"} element={<TestSettings />} />
+
+                      {/* <Route
+                        path={"/ListSettings"}
+                        element={<ListTestSettings />}
+                      />
+                      <Route
+                        path={"/ListSettings2"}
+                        element={<ListTestSettings2 />}
+                      /> */}
                     </Routes>
                   ) : (
                     <Offline />
