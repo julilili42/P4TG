@@ -1,37 +1,23 @@
 import { Row, Col, Table, Form } from "react-bootstrap";
-import { GenerationMode } from "../../common/Interfaces";
+import { GenerationMode, TrafficGenData } from "../../common/Interfaces";
 import StreamSettingsList from "../settings/StreamSettingsList";
 import { StyledCol } from "../../sites/Settings";
 
-{
-  /* modeCurrentTab anstatt modeList[currentTabIndex as any]*/
-}
-{
-  /* (streamCurrentTab && streamCurrentTab.length > 0) entfernen? 
-              Tritt auf falls ich alle Tabs lösche 
-            */
-}
-
 const PortMappingTable = ({
-  streamCurrentTab,
-  modeCurrentTab,
   ports,
-  portTxRxMappingCurrentTab,
   running,
   handlePortChange,
-  streamSettingCurrentTab,
+  currentTest,
 }: {
-  streamCurrentTab: any[];
-  modeCurrentTab: GenerationMode;
   ports: any[];
-  portTxRxMappingCurrentTab: { [key: string]: number };
   running: boolean;
   handlePortChange: (event: any, pid: number) => void;
-  streamSettingCurrentTab: any[];
+  currentTest: TrafficGenData | null;
 }) => {
   if (
-    (streamCurrentTab && streamCurrentTab.length > 0) ||
-    modeCurrentTab === GenerationMode.ANALYZE
+    currentTest &&
+    ((currentTest.streams && currentTest.streams.length > 0) ||
+      currentTest.mode === GenerationMode.ANALYZE)
   ) {
     return (
       <Row>
@@ -47,17 +33,16 @@ const PortMappingTable = ({
               <tr>
                 <th>TX Port</th>
                 <th>RX Port</th>
-                {streamCurrentTab &&
-                  streamCurrentTab.map((v: any, i: any) => {
-                    return <th key={i}>Stream {v.app_id}</th>;
-                  })}
+                {currentTest.streams.map((v: any, i: any) => {
+                  return <th key={i}>Stream {v.app_id}</th>;
+                })}
               </tr>
             </thead>
             <tbody>
               {ports.map((v, i) => {
                 if (v.loopback === "BF_LPBK_NONE") {
                   const selectValue =
-                    portTxRxMappingCurrentTab[v.pid.toString()] || -1;
+                    currentTest.port_tx_rx_mapping[v.pid.toString()] || -1;
                   return (
                     <tr key={i}>
                       <StyledCol>
@@ -86,8 +71,8 @@ const PortMappingTable = ({
                       </StyledCol>
 
                       <StreamSettingsList
-                        stream_settings={streamSettingCurrentTab}
-                        streams={streamCurrentTab}
+                        stream_settings={currentTest.stream_settings || []}
+                        streams={currentTest.streams || []}
                         running={running}
                         port={v}
                       />

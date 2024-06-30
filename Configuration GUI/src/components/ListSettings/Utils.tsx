@@ -1,5 +1,9 @@
 import { Button, Col, Form, Row } from "react-bootstrap";
-import { GenerationMode, TestMode } from "../../common/Interfaces";
+import {
+  GenerationMode,
+  TestMode,
+  TrafficGenData,
+} from "../../common/Interfaces";
 import translate from "../translation/Translate";
 import InfoBox from "../InfoBox";
 
@@ -27,17 +31,17 @@ const SaveResetButtons = ({
 const AddStreamButton = ({
   addStream,
   running,
-  modeCurrentTab,
+  currentTest,
 }: {
   addStream: () => void;
   running: boolean;
-  modeCurrentTab: GenerationMode;
+  currentTest: TrafficGenData | null;
 }) => {
   return (
     <Row className={"mb-3"}>
       <Col className={"text-start"}>
-        {running ? null : modeCurrentTab === GenerationMode.CBR ||
-          modeCurrentTab === GenerationMode.MPPS ? (
+        {running || !currentTest ? null : currentTest.mode ===
+            GenerationMode.CBR || currentTest.mode === GenerationMode.MPPS ? (
           <Button onClick={addStream} variant="primary">
             <i className="bi bi-plus" /> Add stream
           </Button>
@@ -50,7 +54,7 @@ const AddStreamButton = ({
 const TotalDuration = ({ currentLanguage, totalDuration }: any) => (
   <Col className={"col-3"} style={{ display: "flex", justifyContent: "right" }}>
     <Button variant="secondary" disabled={true}>
-      <i className="bi bi-clock-history" />
+      <i className="bi bi-clock-history" />{" "}
       {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
       {translate("seconds", currentLanguage)}
     </Button>
@@ -75,11 +79,15 @@ const TestModeSelection = ({
 
 const GenerationModeSelection = ({
   currentLanguage,
-  modeCurrentTab,
+  currentTest,
   handleModeChange,
   running,
-  currentTestMode,
-}: any) => {
+}: {
+  currentLanguage: string;
+  currentTest: TrafficGenData | null;
+  handleModeChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  running: boolean;
+}) => {
   return (
     <Col className={"col-2 d-flex flex-row align-items-center"}>
       <Form.Select
@@ -87,48 +95,46 @@ const GenerationModeSelection = ({
         required
         onChange={handleModeChange}
         className="me-3"
-        value={modeCurrentTab}
+        value={currentTest ? currentTest.mode : GenerationMode.CBR}
       >
         <option value={GenerationMode.CBR}>CBR</option>
         <option value={GenerationMode.POISSON}>Poisson</option>
         <option value={GenerationMode.MPPS}>Mpps</option>
         <option value={GenerationMode.ANALYZE}>Monitor</option>
       </Form.Select>
-      {currentTestMode === TestMode.SINGLE && (
-        <InfoBox>
-          <>
-            <p>{translate("P4TG supports multiple modes.", currentLanguage)}</p>
-            <h5>{translate("Constant bit rate", currentLanguage)} (CBR)</h5>
-            <p>
-              {translate(
-                "Constant bit rate (CBR) traffic sends traffic with a constant rate.",
-                currentLanguage
-              )}
-            </p>
-            <h5>Poisson</h5>
-            <p>
-              {translate(
-                "Poisson traffic is traffic with random inter-arrival times but a constant average traffic rate.",
-                currentLanguage
-              )}
-            </p>
-            <h5>Mpps</h5>
-            <p>
-              {translate(
-                "In Mpps mode, P4TG generates traffic with a fixed number of packets per seconds.",
-                currentLanguage
-              )}
-            </p>
-            <h5>Monitor/Analyze</h5>
-            <p>
-              {translate(
-                "In monitor/analyze mode, P4TG forwards traffic received on its ports and measures L1/L2 rates, packet sizes/types and inter-arrival times.",
-                currentLanguage
-              )}
-            </p>
-          </>
-        </InfoBox>
-      )}
+      <InfoBox>
+        <>
+          <p>{translate("P4TG supports multiple modes.", currentLanguage)}</p>
+          <h5>{translate("Constant bit rate", currentLanguage)} (CBR)</h5>
+          <p>
+            {translate(
+              "Constant bit rate (CBR) traffic sends traffic with a constant rate.",
+              currentLanguage
+            )}
+          </p>
+          <h5>Poisson</h5>
+          <p>
+            {translate(
+              "Poisson traffic is traffic with random inter-arrival times but a constant average traffic rate.",
+              currentLanguage
+            )}
+          </p>
+          <h5>Mpps</h5>
+          <p>
+            {translate(
+              "In Mpps mode, P4TG generates traffic with a fixed number of packets per second.",
+              currentLanguage
+            )}
+          </p>
+          <h5>Monitor/Analyze</h5>
+          <p>
+            {translate(
+              "In monitor/analyze mode, P4TG forwards traffic received on its ports and measures L1/L2 rates, packet sizes/types and inter-arrival times.",
+              currentLanguage
+            )}
+          </p>
+        </>
+      </InfoBox>
     </Col>
   );
 };

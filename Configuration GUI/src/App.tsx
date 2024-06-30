@@ -32,12 +32,11 @@ import Ports from "./sites/Ports";
 import Settings from "./sites/Settings";
 import Offline from "./sites/Offline";
 import Tables from "./sites/Tables";
-import TestSettings from "./components/TestSettings";
 import config from "./config";
 import { StreamSettings } from "./common/Interfaces";
 import { Stream } from "./common/Interfaces";
 import { validateStreams, validateStreamSettings } from "./common/Validators";
-import ListTestSettings from "./components/ListSettings/ListSettings";
+import ListSettings from "./components/ListSettings/ListSettings";
 
 const App = () => {
   const [error, set_error] = useState(false);
@@ -55,6 +54,8 @@ const App = () => {
   };
 
   const Wrapper = styled.div``;
+
+  // needs to be updated to fit the new local storage structure
 
   // Validates the stored streams and stream settings in the local storage
   // Clears local storage if some streams/settings are not valid
@@ -132,18 +133,7 @@ const App = () => {
                       <Route path={"/home"} element={<Home />} />
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
-                      <Route path={"/tests"} element={<ListTestSettings />} />
-
-                      <Route path={"/tests2"} element={<TestSettings />} />
-
-                      {/* <Route
-                        path={"/ListSettings"}
-                        element={<ListTestSettings />}
-                      />
-                      <Route
-                        path={"/ListSettings2"}
-                        element={<ListTestSettings2 />}
-                      /> */}
+                      <Route path={"/tests"} element={<ListSettings />} />
                     </Routes>
                   ) : (
                     <Offline />

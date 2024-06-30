@@ -18,11 +18,10 @@ import {
   TestMode,
   Statistics as StatInterface,
   StatisticsObject,
-  Stream,
-  StreamSettings,
   TimeStatistics,
   TimeStatisticsObject,
   TrafficGenData,
+  TrafficGenList,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
@@ -71,20 +70,8 @@ const Home = () => {
     parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
   );
 
-  const [streamsList, set_streamsList] = useState<{ [key: number]: Stream[] }>(
-    JSON.parse(localStorage.getItem("streamsList") ?? "{}")
-  );
-  const [streamSettingsList, set_streamSettingsList] = useState<{
-    [key: number]: StreamSettings[];
-  }>(JSON.parse(localStorage.getItem("streamSettingsList") ?? "{}"));
-  const [portTxRxMappingList, set_portTxRxMappingList] = useState<{
-    [key: number]: { [name: number]: number };
-  }>(JSON.parse(localStorage.getItem("port_tx_rx_mapping_list") ?? "{}"));
-  const [modeList, set_modeList] = useState<{ [key: number]: number }>(
-    JSON.parse(localStorage.getItem("gen-mode-list") ?? "{}")
-  );
-  const [durationList, set_durationList] = useState<{ [key: number]: number }>(
-    JSON.parse(localStorage.getItem("duration-list") ?? "{}")
+  const [traffic_gen_list, set_traffic_gen_list] = useState<TrafficGenList>(
+    JSON.parse(localStorage.getItem("traffic_gen") ?? "{}")
   );
 
   const [statistics, set_statistics] =
@@ -164,12 +151,12 @@ const Home = () => {
       await del({ route: "/trafficgen" });
       set_running(false);
     } else {
-      const oneModeAnalyze = Object.values(modeList).some(
-        (value) => value === GenerationMode.ANALYZE
+      const oneModeAnalyze = Object.values(traffic_gen_list).some(
+        (test) => test.mode === GenerationMode.ANALYZE
       );
 
-      const streamsIsZero = Object.values(streamsList).every(
-        (streams) => streams.length === 0
+      const streamsIsZero = Object.values(traffic_gen_list).every(
+        (test) => test.streams.length === 0
       );
 
       if (streamsIsZero && oneModeAnalyze) {
@@ -177,9 +164,9 @@ const Home = () => {
       } else {
         let overall_rates = [];
 
-        for (const [_, stream] of Object.entries(streamsList)) {
+        for (const test of Object.values(traffic_gen_list)) {
           let overall_rate = 0;
-          stream.forEach((v) => {
+          test.streams.forEach((v: any) => {
             overall_rate += v.traffic_rate;
           });
           overall_rates.push(overall_rate);
@@ -187,37 +174,38 @@ const Home = () => {
 
         const max_rate = Math.max(...overall_rates);
 
-        const oneModeMPPS = Object.values(modeList).some(
-          (value) => value === GenerationMode.MPPS
+        const oneModeMPPS = Object.values(traffic_gen_list).some(
+          (test) => test.gen_mode === GenerationMode.MPPS
         );
 
         if (oneModeMPPS && max_rate > 100) {
           alert("Sum of stream rates > 100 Gbps!");
         } else {
           if (test_mode === TestMode.SINGLE) {
-            const singleTestStreams = streamsList["1"] || [];
-            const singleTestStreamSettings = streamSettingsList["1"] || [];
-            const singleTestPortTxRxMapping = portTxRxMappingList["1"] || {};
-            const singleTestMode = modeList["1"] || {};
-            localStorage.setItem("duration-list", JSON.stringify({ "1": 0 }));
+            const singleTest = traffic_gen_list[1];
+            localStorage.setItem(
+              "traffic_gen",
+              JSON.stringify({ "1": { ...singleTest, duration: 0 } })
+            );
 
             await post({
               route: "/trafficgen",
               body: {
-                streams: singleTestStreams,
-                stream_settings: singleTestStreamSettings,
-                port_tx_rx_mapping: singleTestPortTxRxMapping,
-                mode: singleTestMode,
+                streams: singleTest.streams,
+                stream_settings: singleTest.stream_settings,
+                port_tx_rx_mapping: singleTest.port_tx_rx_mapping,
+                mode: singleTest.mode,
               },
             });
           } else if (test_mode === TestMode.MULTI) {
-            const traffic_generations = Object.keys(streamsList).map(
+            const traffic_generations = Object.keys(traffic_gen_list).map(
               (test_number: any) => ({
-                streams: streamsList[test_number],
-                stream_settings: streamSettingsList[test_number],
-                port_tx_rx_mapping: portTxRxMappingList[test_number],
-                mode: modeList[test_number],
-                duration: durationList[test_number],
+                streams: traffic_gen_list[test_number].streams,
+                stream_settings: traffic_gen_list[test_number].stream_settings,
+                port_tx_rx_mapping:
+                  traffic_gen_list[test_number].port_tx_rx_mapping,
+                mode: traffic_gen_list[test_number].mode,
+                duration: traffic_gen_list[test_number].duration,
               })
             );
 
@@ -258,7 +246,8 @@ const Home = () => {
 
         setCurrentTestNumber(currentTestNumber);
 
-        const newTestDuration = allTests[currentTestNumber]?.duration || 0;
+        const newTestDuration =
+          traffic_gen_list[currentTestNumber]?.duration || 0;
         setCurrentTestDuration(newTestDuration);
       }
     }
@@ -280,18 +269,6 @@ const Home = () => {
     }
   };
 
-  const createListFromAllTests = (
-    allTests: { [test_number: string]: TrafficGenData },
-    key: keyof TrafficGenData
-  ): { [test_number: string]: any } => {
-    return Object.fromEntries(
-      Object.entries(allTests).map(([testKey, test]) => [
-        parseInt(testKey),
-        test[key],
-      ])
-    );
-  };
-
   const loadGen = async () => {
     let stats = await get({ route: "/trafficgen" });
 
@@ -302,38 +279,29 @@ const Home = () => {
           stream_settings: stats.data.stream_settings,
           port_tx_rx_mapping: stats.data.port_tx_rx_mapping,
           mode: stats.data.mode,
+          duration: stats.data.duration,
         },
       };
 
-      // Create Hashmaps for each setting from all tests
-      const streamsList = createListFromAllTests(allTests, "streams");
-      const streamSettingsList = createListFromAllTests(
-        allTests,
-        "stream_settings"
+      // Convert allTests to the new traffic_gen_list structure
+      const trafficGenList: TrafficGenList = Object.fromEntries(
+        Object.entries(allTests).map(([testKey, test]: any) => [
+          parseInt(testKey, 10),
+          {
+            streams: test.streams,
+            stream_settings: test.stream_settings,
+            port_tx_rx_mapping: test.port_tx_rx_mapping,
+            mode: test.mode,
+            duration: test.duration,
+          } as TrafficGenData,
+        ])
       );
-      const portTxRxMappingList = createListFromAllTests(
-        allTests,
-        "port_tx_rx_mapping"
-      );
-      const modeList = createListFromAllTests(allTests, "mode");
 
-      // Save the settings (hashmaps) to the local storage
-      localStorage.setItem("streamsList", JSON.stringify(streamsList));
-      localStorage.setItem(
-        "streamSettingsList",
-        JSON.stringify(streamSettingsList)
-      );
-      localStorage.setItem(
-        "port_tx_rx_mapping_list",
-        JSON.stringify(portTxRxMappingList)
-      );
-      localStorage.setItem("gen-mode-list", JSON.stringify(modeList));
+      // Save the trafficGenList to the local storage
+      localStorage.setItem("traffic_gen", JSON.stringify(trafficGenList));
 
-      set_streamsList(streamsList);
-      set_streamSettingsList(streamSettingsList);
-      set_portTxRxMappingList(portTxRxMappingList);
-      set_modeList(modeList);
-
+      // Update the state
+      set_traffic_gen_list(trafficGenList);
       set_running(true);
     } else {
       set_running(false);
@@ -369,12 +337,7 @@ const Home = () => {
     const selectedTimeStatistics =
       time_statistics?.previous_time_statistics?.[testNumber] || null;
 
-    const selectedTrafficGen = {
-      mode: modeList[testNumber],
-      port_tx_rx_mapping: portTxRxMappingList[testNumber],
-      streams: streamsList[testNumber],
-      stream_settings: streamSettingsList[testNumber],
-    };
+    const selectedTrafficGen = traffic_gen_list[testNumber] || null;
 
     setSelectedTest({
       statistics: selectedStatistics,
@@ -382,7 +345,7 @@ const Home = () => {
       trafficGen: selectedTrafficGen,
     });
 
-    setCurrentTest(testNumber); // Update the current test number
+    setCurrentTest(testNumber);
   };
 
   return (
@@ -425,17 +388,34 @@ const Home = () => {
                         data={time_statistics}
                         stats={statistics}
                         port_mapping={
-                          portTxRxMappingList[currentTestNumber] || {}
+                          traffic_gen_list[currentTestNumber]
+                            ?.port_tx_rx_mapping || {}
                         }
                         onConvert={handleGraphConvert}
                       />
                       <Download
                         data={time_statistics}
                         stats={statistics}
-                        portTxRxMappingList={portTxRxMappingList}
-                        modeList={modeList}
-                        streamsList={streamsList}
-                        streamSettingsList={streamSettingsList}
+                        portTxRxMappingList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.port_tx_rx_mapping]
+                          )
+                        )}
+                        modeList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.mode]
+                          )
+                        )}
+                        streamsList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.streams]
+                          )
+                        )}
+                        streamSettingsList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.stream_settings]
+                          )
+                        )}
                         graph_images={imageData}
                       />
                     </>
@@ -494,60 +474,63 @@ const Home = () => {
               <StatView
                 stats={statistics}
                 time_stats={time_statistics}
-                port_mapping={portTxRxMappingList[currentTestNumber] || {}}
+                port_mapping={
+                  traffic_gen_list[currentTestNumber]?.port_tx_rx_mapping || {}
+                }
                 visual={visual}
-                mode={modeList[currentTestNumber] || 0}
+                mode={traffic_gen_list[currentTestNumber]?.mode || 0}
               />
             </Tab>
-            {activePorts(portTxRxMappingList[currentTestNumber] || {}).map(
-              (v, i) => {
-                let mapping: { [name: number]: number } = { [v.tx]: v.rx };
-                return (
-                  <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
-                    <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
-                      <Tab eventKey={"Overview"} title={"Overview"}>
-                        <StatView
-                          stats={statistics}
-                          time_stats={time_statistics}
-                          port_mapping={mapping}
-                          mode={modeList[currentTestNumber] || 0}
-                          visual={visual}
-                        />
-                      </Tab>
-                      {Object.keys(mapping)
-                        .map(Number)
-                        .map((v) => {
-                          let stream_ids = getStreamIDsByPort(
-                            v,
-                            streamSettingsList[currentTestNumber] || [],
-                            streamsList[currentTestNumber] || []
+            {activePorts(
+              traffic_gen_list[currentTestNumber]?.port_tx_rx_mapping || {}
+            ).map((v, i) => {
+              let mapping: { [name: number]: number } = { [v.tx]: v.rx };
+              return (
+                <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
+                  <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
+                    <Tab eventKey={"Overview"} title={"Overview"}>
+                      <StatView
+                        stats={statistics}
+                        time_stats={time_statistics}
+                        port_mapping={mapping}
+                        mode={traffic_gen_list[currentTestNumber]?.mode || 0}
+                        visual={visual}
+                      />
+                    </Tab>
+                    {Object.keys(mapping)
+                      .map(Number)
+                      .map((v) => {
+                        let stream_ids = getStreamIDsByPort(
+                          v,
+                          traffic_gen_list[currentTestNumber]
+                            ?.stream_settings || [],
+                          traffic_gen_list[currentTestNumber]?.streams || []
+                        );
+                        return stream_ids.map((stream: number, i) => {
+                          let stream_frame_size: any = getStreamFrameSize(
+                            traffic_gen_list[currentTestNumber]?.streams || [],
+                            stream
                           );
-                          return stream_ids.map((stream: number, i) => {
-                            let stream_frame_size: any = getStreamFrameSize(
-                              streamsList[currentTestNumber] || [],
-                              stream
-                            );
-                            return (
-                              <Tab
-                                key={i}
-                                eventKey={stream}
-                                title={"Stream " + stream}
-                              >
-                                <StreamView
-                                  stats={statistics}
-                                  port_mapping={mapping}
-                                  stream_id={stream}
-                                  frame_size={stream_frame_size}
-                                />
-                              </Tab>
-                            );
-                          });
-                        })}
-                    </Tabs>
-                  </Tab>
-                );
-              }
-            )}
+                          return (
+                            <Tab
+                              key={i}
+                              eventKey={stream}
+                              title={"Stream " + stream}
+                            >
+                              <StreamView
+                                stats={statistics}
+                                port_mapping={mapping}
+                                stream_id={stream}
+                                frame_size={stream_frame_size}
+                              />
+                            </Tab>
+                          );
+                        });
+                      })}
+                  </Tabs>
+                </Tab>
+              );
+            })}
           </Tabs>
         </Tab>
         {Object.keys(statistics.previous_statistics || {}).map((key) => (

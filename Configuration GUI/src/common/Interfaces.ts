@@ -267,3 +267,7 @@ export interface TrafficGenData {
   port_tx_rx_mapping: { [name: number]: number };
   duration?: number;
 }
+
+export interface TrafficGenList {
+  [testId: number]: TrafficGenData;
+}
