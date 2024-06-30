@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Col, Form, Row, Tab, Table, Tabs } from "react-bootstrap";
+import { Col, Form, Row, Tab, Tabs } from "react-bootstrap";
 import { get } from "../../common/API";
 import {
   GenerationMode,
@@ -9,16 +9,19 @@ import {
   DefaultStreamSettings,
   TestMode,
 } from "../../common/Interfaces";
-import { StyledCol } from "../../sites/Settings";
-import StreamSettingsList from "../settings/StreamSettingsList";
-import StreamElement from "../settings/StreamElement";
 import Loader from "../Loader";
 import { GitHub } from "../../sites/Home";
 import translate from "../translation/Translate";
 import InfoBox from "../InfoBox";
-import { GenerationModeSelection, TestModeSelection } from "./ModeSelection";
-import TotalDuration from "./TotalDuration";
-import SaveResetButtons from "./Buttons";
+import {
+  SaveResetButtons,
+  AddStreamButton,
+  GenerationModeSelection,
+  TestModeSelection,
+  TotalDuration,
+} from "./Utils";
+import PortMappingTable from "./PortMappingTable";
+import StreamTable from "./StreamTable";
 
 interface Tab {
   eventKey: string;
@@ -472,6 +475,32 @@ const ListTestSettings = () => {
     }
   };
 
+  const handlePortChange = (event: any, pid: number) => {
+    let current = {
+      ...portTxRxMappingCurrentTab,
+    };
+
+    if (parseInt(event.target.value) === -1) {
+      delete current[pid];
+    } else {
+      current[pid] = parseInt(event.target.value);
+    }
+
+    updatePortTxRxMappingCurrentTab(current);
+  };
+
+  // generalized function to update the current tab settings
+  const updatePortTxRxMappingCurrentTab = (newMapping: {
+    [pid: string]: number;
+  }) => {
+    const updatedMapping = {
+      ...portTxRxMappingList,
+      [currentTabIndex as any]: newMapping,
+    };
+    set_portTxRxMappingList(updatedMapping);
+    setPortTxRxMappingCurrentTab(newMapping);
+  };
+
   const updateStreamCurrentTab = (newStreams: Stream[]) => {
     const updatedStreams = {
       ...streamsList,
@@ -490,31 +519,6 @@ const ListTestSettings = () => {
     };
     set_streamSettingsList(updatedStreamSettings);
     setStreamSettingCurrentTab(newStreamSettings);
-  };
-
-  const updatePortTxRxMappingCurrentTab = (newMapping: {
-    [pid: string]: number;
-  }) => {
-    const updatedMapping = {
-      ...portTxRxMappingList,
-      [currentTabIndex as any]: newMapping,
-    };
-    set_portTxRxMappingList(updatedMapping);
-    setPortTxRxMappingCurrentTab(newMapping);
-  };
-
-  const handlePortChange = (event: any, pid: number) => {
-    let current = {
-      ...portTxRxMappingCurrentTab,
-    };
-
-    if (parseInt(event.target.value) === -1) {
-      delete current[pid];
-    } else {
-      current[pid] = parseInt(event.target.value);
-    }
-
-    updatePortTxRxMappingCurrentTab(current);
   };
 
   const addStream = () => {
@@ -570,13 +574,10 @@ const ListTestSettings = () => {
       };
       set_durationList(updatedDurationList);
     }
-
-    console.log(durationList);
   };
   const handleTestModeChange = (event: any) => {
     const value = Number(event.target.value);
     localStorage.setItem("test-mode", String(value));
-    /* saveToLocalStorage("test-mode", value); */
     setCurrentTestMode(value);
   };
   const handleTotalDurationChange = (durations: { [key: string]: number }) => {
@@ -586,9 +587,6 @@ const ListTestSettings = () => {
     });
     setTotalDuration(total);
   };
-  const isEmptyObject = (obj: any) => {
-    return Object.keys(obj).length === 0 && obj.constructor === Object;
-  };
 
   const isTabValid = (
     index: number,
@@ -596,6 +594,10 @@ const ListTestSettings = () => {
     durationList: { [key: number]: number },
     portTxRxMappingList: { [key: number]: any }
   ) => {
+    const isEmptyObject = (obj: any) => {
+      return Object.keys(obj).length === 0 && obj.constructor === Object;
+    };
+
     if (currentTestMode === TestMode.MULTI) {
       return (
         durationList[index] !== 0 && !isEmptyObject(portTxRxMappingList[index])
@@ -615,18 +617,14 @@ const ListTestSettings = () => {
     return () => clearInterval(interval);
   }, [currentLanguage]);
 
-  console.log(currentTestMode);
-
   return (
     <Loader loaded={loaded}>
       <Row className="align-items-end justify-content-between">
-        {/* Test mode selection */}
         <TestModeSelection
           currentLanguage={currentLanguage}
           currentTestMode={currentTestMode}
           handleTestModeChange={handleTestModeChange}
         />
-        {/* Total Duration */}
         {currentTestMode ? (
           <TotalDuration
             currentLanguage={currentLanguage}
@@ -738,7 +736,6 @@ const ListTestSettings = () => {
             </Row>
 
             <Row className="align-items-end">
-              {/* Generation Mode Selection */}
               <GenerationModeSelection
                 currentLanguage={currentLanguage}
                 modeCurrentTab={modeCurrentTab}
@@ -817,136 +814,33 @@ const ListTestSettings = () => {
               </Col>
             </Row>
 
-            {/* Streams Element */}
+            <StreamTable
+              {...{
+                streamCurrentTab,
+                modeCurrentTab,
+                removeStream,
+                running,
+                streamSettingCurrentTab,
+              }}
+            />
 
-            {modeCurrentTab != GenerationMode.ANALYZE ? (
-              <Row>
-                <Col>
-                  <Table
-                    striped
-                    bordered
-                    hover
-                    size="sm"
-                    className={"mt-3 mb-3 text-center"}
-                  >
-                    <thead className={"table-dark"}>
-                      <tr>
-                        <th>Stream-ID</th>
-                        <th>Frame Size</th>
-                        <th>Rate</th>
-                        <th>Mode</th>
-                        <th>VxLAN &nbsp;</th>
-                        <th>Encapsulation &nbsp;</th>
-                        <th>Options</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {streamCurrentTab.map((v, i) => {
-                        v.app_id = i + 1;
-                        return (
-                          <StreamElement
-                            key={i}
-                            mode={modeCurrentTab}
-                            data={v}
-                            remove={removeStream}
-                            running={running}
-                            stream_settings={streamSettingCurrentTab}
-                          />
-                        );
-                      })}
-                    </tbody>
-                  </Table>
-                </Col>
-              </Row>
-            ) : null}
+            <AddStreamButton
+              addStream={addStream}
+              running={running}
+              modeCurrentTab={modeCurrentTab}
+            />
 
-            {/* Add stream */}
-
-            <Row className={"mb-3"}>
-              <Col className={"text-start"}>
-                {running ? null : modeCurrentTab === GenerationMode.CBR ||
-                  modeCurrentTab == GenerationMode.MPPS ? (
-                  <Button onClick={addStream} variant="primary">
-                    <i className="bi bi-plus" /> Add stream
-                  </Button>
-                ) : null}
-              </Col>
-            </Row>
-
-            {/* Stream settings element */}
-
-            {/* modeCurrentTab anstatt modeList[currentTabIndex as any]*/}
-            {/* (streamCurrentTab && streamCurrentTab.length > 0) entfernen? 
-              Tritt auf falls ich alle Tabs lösche 
-            */}
-            {(streamCurrentTab && streamCurrentTab.length > 0) ||
-            modeCurrentTab == GenerationMode.ANALYZE ? (
-              <Row>
-                <Col>
-                  <Table
-                    striped
-                    bordered
-                    hover
-                    size="sm"
-                    className={"mt-3 mb-3 text-center"}
-                  >
-                    <thead className={"table-dark"}>
-                      <tr>
-                        <th>TX Port</th>
-                        <th>RX Port</th>
-                        {streamCurrentTab &&
-                          streamCurrentTab.map((v: any, i: any) => {
-                            return <th key={i}>Stream {v.app_id}</th>;
-                          })}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ports.map((v, i) => {
-                        if (v.loopback == "BF_LPBK_NONE") {
-                          const selectValue =
-                            portTxRxMappingCurrentTab[v.pid.toString()] || -1;
-                          return (
-                            <tr key={i}>
-                              <StyledCol>
-                                {v.port} ({v.pid})
-                              </StyledCol>
-                              <StyledCol>
-                                <Form.Select
-                                  disabled={running || !v.status}
-                                  required
-                                  value={selectValue}
-                                  onChange={(event: any) =>
-                                    handlePortChange(event, v.pid)
-                                  }
-                                >
-                                  <option value={-1}>Select RX Port</option>
-                                  {ports.map((v, i) => {
-                                    if (v.loopback == "BF_LPBK_NONE") {
-                                      return (
-                                        <option key={i} value={v.pid}>
-                                          {v.port} ({v.pid})
-                                        </option>
-                                      );
-                                    }
-                                  })}
-                                </Form.Select>
-                              </StyledCol>
-
-                              <StreamSettingsList
-                                stream_settings={streamSettingCurrentTab}
-                                streams={streamCurrentTab}
-                                running={running}
-                                port={v}
-                              />
-                            </tr>
-                          );
-                        }
-                      })}
-                    </tbody>
-                  </Table>
-                </Col>
-              </Row>
-            ) : null}
+            <PortMappingTable
+              {...{
+                streamCurrentTab,
+                modeCurrentTab,
+                ports,
+                portTxRxMappingCurrentTab,
+                running,
+                handlePortChange,
+                streamSettingCurrentTab,
+              }}
+            />
 
             <SaveResetButtons onSave={save} onReset={reset} running={running} />
           </Tab>

@@ -46,10 +46,16 @@ import translate from "../translation/Translate";
 const DownloadPdf = ({
   stats,
   port_mapping,
+  mode,
+  streams,
+  stream_settings,
   graph_images,
 }: {
   stats: Statistics;
   port_mapping: { [name: number]: number };
+  mode: number;
+  streams: Stream[];
+  stream_settings: StreamSettings[];
   graph_images: string[];
 }) => {
   const [rtt, set_rtt] = useState({
@@ -76,15 +82,6 @@ const DownloadPdf = ({
       status: boolean;
     }[]
   >([]);
-  const [streams, set_streams] = useState<Stream[]>(
-    JSON.parse(localStorage.getItem("streams") ?? "[]")
-  );
-  const [mode, set_mode] = useState(
-    parseInt(localStorage.getItem("gen-mode") || String(GenerationMode.NONE))
-  );
-  // @ts-ignore
-  // prettier-ignore
-  const [stream_settings, set_stream_settings] = useState<StreamSettings[]>(JSON.parse(localStorage.getItem("streamSettings")) || []);
 
   const loadPorts = async () => {
     let stats = await get({ route: "/ports" });
@@ -169,7 +166,7 @@ const DownloadPdf = ({
     subHeaders.unshift([`${translate("Summary", currentLanguage)}`]);
     subHeaders.unshift([
       `${translate("Stream Configuration in", currentLanguage)} ${
-        modes[mode]
+        modes[mode as any]
       } ${translate("mode", currentLanguage)}`,
     ]);
     subHeaders.unshift([`${translate("Test explanation", currentLanguage)}`]);

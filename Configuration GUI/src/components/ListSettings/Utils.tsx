@@ -1,8 +1,61 @@
-import React from "react";
-import { Col, Form } from "react-bootstrap";
-import translate from "../translation/Translate";
+import { Button, Col, Form, Row } from "react-bootstrap";
 import { GenerationMode, TestMode } from "../../common/Interfaces";
+import translate from "../translation/Translate";
 import InfoBox from "../InfoBox";
+
+const SaveResetButtons = ({
+  onSave,
+  onReset,
+  running,
+}: {
+  onSave: () => void;
+  onReset: () => void;
+  running: boolean;
+}) => {
+  return (
+    <>
+      <Button onClick={onSave} disabled={running} variant="primary">
+        <i className="bi bi-check" /> Save
+      </Button>{" "}
+      <Button onClick={onReset} disabled={running} variant="danger">
+        <i className="bi bi-x-octagon-fill" /> Reset
+      </Button>
+    </>
+  );
+};
+
+const AddStreamButton = ({
+  addStream,
+  running,
+  modeCurrentTab,
+}: {
+  addStream: () => void;
+  running: boolean;
+  modeCurrentTab: GenerationMode;
+}) => {
+  return (
+    <Row className={"mb-3"}>
+      <Col className={"text-start"}>
+        {running ? null : modeCurrentTab === GenerationMode.CBR ||
+          modeCurrentTab === GenerationMode.MPPS ? (
+          <Button onClick={addStream} variant="primary">
+            <i className="bi bi-plus" /> Add stream
+          </Button>
+        ) : null}
+      </Col>
+    </Row>
+  );
+};
+
+const TotalDuration = ({ currentLanguage, totalDuration }: any) => (
+  <Col className={"col-3"} style={{ display: "flex", justifyContent: "right" }}>
+    <Button variant="secondary" disabled={true}>
+      <i className="bi bi-clock-history" />
+      {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
+      {translate("seconds", currentLanguage)}
+    </Button>
+  </Col>
+);
 
 const TestModeSelection = ({
   currentLanguage,
@@ -80,4 +133,10 @@ const GenerationModeSelection = ({
   );
 };
 
-export { TestModeSelection, GenerationModeSelection };
+export {
+  SaveResetButtons,
+  AddStreamButton,
+  TestModeSelection,
+  GenerationModeSelection,
+  TotalDuration,
+};

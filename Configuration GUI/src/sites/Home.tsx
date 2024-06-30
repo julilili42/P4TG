@@ -432,9 +432,10 @@ const Home = () => {
                       <Download
                         data={time_statistics}
                         stats={statistics}
-                        port_mapping={
-                          portTxRxMappingList[currentTestNumber] || {}
-                        }
+                        portTxRxMappingList={portTxRxMappingList}
+                        modeList={modeList}
+                        streamsList={streamsList}
+                        streamSettingsList={streamSettingsList}
                         graph_images={imageData}
                       />
                     </>
