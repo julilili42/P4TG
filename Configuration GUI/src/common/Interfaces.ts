@@ -271,3 +271,7 @@ export interface TrafficGenData {
 export interface TrafficGenList {
   [testId: number]: TrafficGenData;
 }
+
+export interface PreviousStatistics {
+  [testId: number]: Statistics;
+}

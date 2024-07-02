@@ -49,6 +49,7 @@ const StreamElement = ({
   );
   const [number_of_lse, set_number_of_lse] = useState(data.number_of_lse);
   const [stream_settings_c, set_stream_settings] = useState(stream_settings);
+  const [vxlan, setVxlan] = useState(data.vxlan);
 
   const handleEncapsulationChange = (
     event: React.ChangeEvent<HTMLSelectElement>
@@ -91,6 +92,10 @@ const StreamElement = ({
     data.number_of_lse = parseInt(event.target.value);
     update_settings();
   };
+
+  useEffect(() => {
+    setVxlan(data.vxlan);
+  }, [data.vxlan]);
 
   const [currentLanguage, setCurrentLanguage] = useState(
     localStorage.getItem("language") || "en-US"
@@ -197,9 +202,11 @@ const StreamElement = ({
         <Form.Check
           type={"switch"}
           disabled={running}
-          defaultChecked={data.vxlan}
+          checked={vxlan}
           onChange={(event) => {
-            data.vxlan = !data.vxlan;
+            const newVxlan = event.target.checked;
+            setVxlan(newVxlan);
+            data.vxlan = newVxlan;
           }}
         ></Form.Check>
       </StyledCol>

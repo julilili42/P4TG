@@ -52,14 +52,37 @@ const AddStreamButton = ({
 };
 
 const TotalDuration = ({ currentLanguage, totalDuration }: any) => (
-  <Col className={"col-3"} style={{ display: "flex", justifyContent: "right" }}>
-    <Button variant="secondary" disabled={true}>
-      <i className="bi bi-clock-history" />{" "}
-      {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
-      {translate("seconds", currentLanguage)}
-    </Button>
-  </Col>
+  <Button variant="secondary" disabled={true}>
+    <i className="bi bi-clock-history" />{" "}
+    {translate("Total Duration", currentLanguage)}: {totalDuration}{" "}
+    {translate("seconds", currentLanguage)}
+  </Button>
 );
+
+const ImportExport = ({
+  handleImport,
+  handleExport,
+  running,
+  currentLanguage,
+}: {
+  handleImport: (e: any) => void;
+  handleExport: () => void;
+  running: boolean;
+  currentLanguage: string;
+}) => {
+  return (
+    <>
+      <Button onClick={handleImport} disabled={running} variant={"primary"}>
+        <i className="bi bi-cloud-arrow-down-fill" />{" "}
+        {translate("Import", currentLanguage)}
+      </Button>{" "}
+      <Button onClick={handleExport} disabled={running} variant={"danger"}>
+        <i className="bi bi-cloud-arrow-up-fill" />{" "}
+        {translate("Export", currentLanguage)}
+      </Button>
+    </>
+  );
+};
 
 const TestModeSelection = ({
   currentLanguage,
@@ -145,4 +168,5 @@ export {
   TestModeSelection,
   GenerationModeSelection,
   TotalDuration,
+  ImportExport,
 };

@@ -2,7 +2,8 @@ import { Dropdown } from "react-bootstrap";
 import DownloadCsv from "./csv/Csv";
 import DownloadPdf from "./pdf/Pdf";
 import { Statistics, TimeStatistics } from "../common/Interfaces";
-import { Stream, StreamSettings } from "../common/Interfaces";
+import { TrafficGenList, Stream, StreamSettings } from "../common/Interfaces";
+
 const Download = ({
   data,
   stats,
@@ -13,7 +14,9 @@ const Download = ({
   graph_images,
 }: {
   data: TimeStatistics;
-  stats: Statistics;
+  stats: {
+    [key: number]: Statistics;
+  };
   portTxRxMappingList: {
     [key: number]: { [name: number]: number };
   };
@@ -29,13 +32,14 @@ const Download = ({
   const stream_settings = Object.values(streamSettingsList).slice(-1)[0];
   const streams = Object.values(streamsList).slice(-1)[0];
   const port_mapping = Object.values(portTxRxMappingList).slice(-1)[0];
+  const statistics = Object.values(stats).slice(-1)[0];
 
-  const csvButtonProps = { data, stats, port_mapping };
+  const csvButtonProps = { data, stats: statistics, port_mapping };
 
   const { handleDownloadCsv } = DownloadCsv(csvButtonProps);
 
   const pdfButtonProps = {
-    stats,
+    stats: statistics,
     port_mapping,
     mode,
     streams,
@@ -45,6 +49,29 @@ const Download = ({
 
   const { handleDownloadPdf } = DownloadPdf(pdfButtonProps);
 
+  /* 
+portTxRxMappingList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.port_tx_rx_mapping]
+                          )
+                        )}
+                        modeList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.mode]
+                          )
+                        )}
+                        streamsList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.streams]
+                          )
+                        )}
+                        streamSettingsList={Object.fromEntries(
+                          Object.entries(traffic_gen_list).map(
+                            ([key, value]) => [key, value.stream_settings]
+                          )
+                        )}
+                        
+   */
   return (
     <div style={{ position: "absolute", width: "100%" }}>
       <Dropdown>

@@ -134,6 +134,7 @@ const App = () => {
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
                       <Route path={"/tests"} element={<ListSettings />} />
+                      <Route path={"/settings"} element={<Settings />} />
                     </Routes>
                   ) : (
                     <Offline />

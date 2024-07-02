@@ -22,6 +22,7 @@ import {
   TimeStatisticsObject,
   TrafficGenData,
   TrafficGenList,
+  PreviousStatistics,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
@@ -76,6 +77,8 @@ const Home = () => {
 
   const [statistics, set_statistics] =
     useState<StatInterface>(StatisticsObject);
+  const [previous_statistics, set_previous_statistics] =
+    useState<PreviousStatistics>({ "1": StatisticsObject });
   const [time_statistics, set_time_statistics] =
     useState<TimeStatistics>(TimeStatisticsObject);
 
@@ -395,7 +398,7 @@ const Home = () => {
                       />
                       <Download
                         data={time_statistics}
-                        stats={statistics}
+                        stats={statistics.previous_statistics || {}}
                         portTxRxMappingList={Object.fromEntries(
                           Object.entries(traffic_gen_list).map(
                             ([key, value]) => [key, value.port_tx_rx_mapping]

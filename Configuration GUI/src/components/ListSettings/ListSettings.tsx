@@ -7,24 +7,25 @@ import {
   DefaultStreamSettings,
   TestMode,
   TrafficGenData,
+  TrafficGenList,
 } from "../../common/Interfaces";
 import Loader from "../Loader";
 import { GitHub } from "../../sites/Home";
 import translate from "../translation/Translate";
-import InfoBox from "../InfoBox";
 import {
   SaveResetButtons,
   AddStreamButton,
   GenerationModeSelection,
   TestModeSelection,
   TotalDuration,
+  ImportExport,
 } from "./Utils";
 import StreamTable from "./StreamTable";
 import PortMappingTable from "./PortMappingTable";
-
-interface TrafficGenList {
-  [testId: number]: TrafficGenData;
-}
+import {
+  validateStreamSettings,
+  validateStreams,
+} from "../../common/Validators";
 
 interface Tab {
   eventKey: string;
@@ -56,6 +57,7 @@ const ListSettings = () => {
     }[]
   >([]);
   const [totalDuration, setTotalDuration] = useState<number>(0);
+  const ref = useRef();
 
   const handleTestModeChange = (event: any) => {
     const value = Number(event.target.value);
@@ -97,6 +99,10 @@ const ListSettings = () => {
     };
 
     const test = trafficGenList[index];
+
+    if (!test) {
+      return false;
+    }
 
     if (currentTestMode === TestMode.MULTI) {
       return test.duration !== 0 && !isEmptyObject(test.port_tx_rx_mapping);
@@ -466,6 +472,111 @@ const ListSettings = () => {
     setTotalDuration(total);
   };
 
+  const exportSettings = () => {
+    const settings = traffic_gen_list;
+
+    const json = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(settings, null, "\t")
+    )}`;
+
+    const link = document.createElement("a");
+    link.href = json;
+    link.download = "settings.json";
+
+    link.click();
+  };
+
+  const importSettings = (e: any) => {
+    // @ts-ignore
+    ref.current.click();
+  };
+
+  const loadSettings = (e: any) => {
+    e.preventDefault();
+
+    const fileReader = new FileReader();
+    fileReader.readAsText(e.target.files[0], "UTF-8");
+
+    fileReader.onload = (e: any) => {
+      let data: TrafficGenList = JSON.parse(e.target.result);
+
+      for (const key in data) {
+        if (
+          !validateStreams(data[key].streams) ||
+          !validateStreamSettings(data[key].stream_settings)
+        ) {
+          alert(translate("Settings not valid.", currentLanguage));
+          // @ts-ignore
+          ref.current.value = "";
+          return;
+        }
+      }
+
+      localStorage.setItem("traffic_gen", JSON.stringify(data));
+
+      set_traffic_gen_list(data);
+      setCurrentTest(data[currentTabIndex as any]);
+
+      alert(translate("Import successful. Reloading...", currentLanguage));
+      window.location.reload();
+    };
+  };
+
+  const loadGen = async () => {
+    let stats = await get({ route: "/trafficgen" });
+
+    if (Object.keys(stats.data).length > 1) {
+      let old_gen_string = JSON.stringify(traffic_gen_list);
+      let new_gen: TrafficGenList;
+
+      set_running(true);
+
+      if (stats.data.all_test) {
+        new_gen = stats.data.all_test;
+        setCurrentTestMode(TestMode.MULTI);
+      } else {
+        const single_test = stats.data as TrafficGenData;
+        new_gen = { "1": single_test };
+        setCurrentTestMode(TestMode.SINGLE);
+      }
+
+      let new_gen_string = JSON.stringify(new_gen);
+
+      if (true) {
+        localStorage.setItem("traffic_gen", new_gen_string);
+        set_traffic_gen_list(new_gen);
+
+        if (stats.data.all_test) {
+          const firstTabKey = Object.keys(new_gen)[0];
+          setCurrentTabIndex(firstTabKey);
+          setCurrentTest(new_gen[firstTabKey as any]);
+        } else {
+          setCurrentTabIndex("1");
+          setCurrentTest(new_gen["1"]);
+        }
+      }
+    } else {
+      set_running(false);
+    }
+  };
+
+  const refresh = async () => {
+    set_loaded(false);
+    await loadPorts();
+    await loadGen();
+    set_loaded(true);
+  };
+
+  useEffect(() => {
+    refresh();
+
+    const interval = setInterval(loadGen, 2000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
   useEffect(() => {
     loadPorts();
     initializeTabs();
@@ -493,14 +604,24 @@ const ListSettings = () => {
           currentTestMode={currentTestMode}
           handleTestModeChange={handleTestModeChange}
         />
-        {currentTestMode ? (
-          <TotalDuration
+
+        <Col className={"col-auto"}>
+          <ImportExport
             currentLanguage={currentLanguage}
-            totalDuration={totalDuration}
+            handleImport={importSettings}
+            handleExport={exportSettings}
+            running={running}
           />
-        ) : (
-          <></>
-        )}
+          {currentTestMode === TestMode.MULTI && (
+            <>
+              {" "}
+              <TotalDuration
+                currentLanguage={currentLanguage}
+                totalDuration={totalDuration}
+              />
+            </>
+          )}
+        </Col>
       </Row>
 
       <div style={{ marginTop: "20px" }}></div>
@@ -660,6 +781,14 @@ const ListSettings = () => {
           </Tab>
         ))}
       </Tabs>
+      <input
+        style={{ display: "none" }}
+        accept=".json"
+        // @ts-ignore
+        ref={ref}
+        onChange={loadSettings}
+        type="file"
+      />
       <GitHub />
     </Loader>
   );
