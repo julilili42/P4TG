@@ -58,6 +58,23 @@ const DownloadPdf = ({
   stream_settings: StreamSettings[];
   graph_images: string[];
 }) => {
+  /* 
+  Ich bekomme hier stats, was das gesamte Statistics Objekt ist und den TestModus. 
+  Entsprechend muss ich diese Komponente anpassen, damit es für den 
+  - Testmode Single: statistics
+  - Testmode Multi: statistics.previous_statistics
+  benutzt. 
+  Ich verwende hier port_mapping, mode, streams, stream_settings etc.. 
+  Ich sollte je nach Test mode diese Werte entsprechend setzen.
+
+
+  Ich könnte einen Parameter i in `handleDownloadPdf` benutzen der dann auf den Test zugreift, den ich anzeigen möchte.
+  Damit könnte ich dann alle Tests in einer for-Schleife durchgehen und die PDFs erstellen.
+
+
+
+  
+  */
   const [rtt, set_rtt] = useState({
     mean: 0,
     max: 0,

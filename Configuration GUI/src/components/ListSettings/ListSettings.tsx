@@ -26,6 +26,7 @@ import {
   validateStreamSettings,
   validateStreams,
 } from "../../common/Validators";
+import Profiles from "./Profile";
 
 interface Tab {
   eventKey: string;
@@ -72,21 +73,40 @@ const ListSettings = () => {
   const [loaded, set_loaded] = useState(true);
 
   const handleTitleChange = (eventKey: string, newTitle: string) => {
-    setTabs((prevTabs) =>
-      prevTabs.map((tab) =>
-        tab.eventKey === eventKey ? { ...tab, title: newTitle } : tab
-      )
-    );
+    if (currentTestMode === TestMode.MULTI) {
+      setTabs((prevTabs) =>
+        prevTabs.map((tab) =>
+          tab.eventKey === eventKey ? { ...tab, title: newTitle } : tab
+        )
+      );
+
+      if (currentTabIndex && currentTest) {
+        const updatedTest: TrafficGenData = {
+          ...currentTest,
+          name: newTitle,
+        };
+
+        const updatedTrafficGenList: TrafficGenList = {
+          ...traffic_gen_list,
+          [currentTabIndex]: updatedTest,
+        };
+
+        set_traffic_gen_list(updatedTrafficGenList);
+        setCurrentTest(updatedTest);
+      }
+    }
   };
 
   const toggleTitleEdit = (eventKey: string) => {
-    setTabs((prevTabs) =>
-      prevTabs.map((tab) =>
-        tab.eventKey === eventKey
-          ? { ...tab, titleEditable: !tab.titleEditable }
-          : tab
-      )
-    );
+    if (currentTestMode === TestMode.MULTI) {
+      setTabs((prevTabs) =>
+        prevTabs.map((tab) =>
+          tab.eventKey === eventKey
+            ? { ...tab, titleEditable: !tab.titleEditable }
+            : tab
+        )
+      );
+    }
   };
 
   const isTabValid = (
@@ -114,11 +134,14 @@ const ListSettings = () => {
   const initializeTabs = () => {
     if (currentTestMode === TestMode.MULTI) {
       const initializedTabs: Tab[] = Object.keys(traffic_gen_list).map(
-        (key) => ({
-          eventKey: `tab-${key}`,
-          title: `Test ${key}`,
-          titleEditable: false,
-        })
+        (key) => {
+          const test = traffic_gen_list[key as any];
+          return {
+            eventKey: `tab-${key}`,
+            title: test.name ?? `Test ${key}`,
+            titleEditable: false,
+          };
+        }
       );
       initializedTabs.push({
         eventKey: "add",
@@ -138,7 +161,7 @@ const ListSettings = () => {
       const initializedTabs: Tab[] = [
         {
           eventKey: "tab-1",
-          title: "Test 1",
+          title: traffic_gen_list[1]?.name ?? "Test 1",
           titleEditable: false,
         },
       ];
@@ -306,6 +329,7 @@ const ListSettings = () => {
         port_tx_rx_mapping: currentTest.port_tx_rx_mapping,
         mode: currentTest.mode,
         duration: currentTest.duration,
+        name: currentTest.name,
       };
 
       const updatedTrafficGenList: TrafficGenList = {
@@ -349,6 +373,7 @@ const ListSettings = () => {
       saveToLocalStorage("traffic_gen", updatedTrafficGenList);
       set_traffic_gen_list(updatedTrafficGenList);
       setCurrentTest(updatedTest);
+      window.location.reload();
 
       alert("Reset complete.");
     } else {
@@ -605,182 +630,191 @@ const ListSettings = () => {
           handleTestModeChange={handleTestModeChange}
         />
 
-        <Col className={"col-auto"}>
-          <ImportExport
-            currentLanguage={currentLanguage}
-            handleImport={importSettings}
-            handleExport={exportSettings}
-            running={running}
-          />
-          {currentTestMode === TestMode.MULTI && (
-            <>
-              {" "}
-              <TotalDuration
-                currentLanguage={currentLanguage}
-                totalDuration={totalDuration}
-              />
-            </>
-          )}
-        </Col>
+        {currentTestMode !== TestMode.PROFILE && (
+          <Col className={"col-auto"}>
+            <ImportExport
+              currentLanguage={currentLanguage}
+              handleImport={importSettings}
+              handleExport={exportSettings}
+              running={running}
+            />
+            {currentTestMode === TestMode.MULTI && (
+              <>
+                {" "}
+                <TotalDuration
+                  currentLanguage={currentLanguage}
+                  totalDuration={totalDuration}
+                />
+              </>
+            )}
+          </Col>
+        )}
       </Row>
 
       <div style={{ marginTop: "20px" }}></div>
-
-      <Tabs
-        onSelect={(k: string | null) => {
-          if (k === "add") {
-            addTab();
-          } else if (k) {
-            setKey(k);
-            setCurrentTabIndex(k.split("-")[1]);
-            setCurrentTest(traffic_gen_list[k.split("-")[1] as any]);
-          }
-        }}
-        activeKey={key}
-      >
-        {tabs.map((tab, index) => (
-          <Tab
-            key={tab.eventKey}
-            eventKey={tab.eventKey}
-            title={
-              tab.eventKey !== "add" ? (
-                <div className="d-flex align-items-center">
-                  {tab.titleEditable ? (
-                    <input
-                      type="text"
-                      value={tab.title}
-                      onChange={(e) =>
-                        handleTitleChange(tab.eventKey, e.target.value)
-                      }
-                      onBlur={() => toggleTitleEdit(tab.eventKey)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          toggleTitleEdit(tab.eventKey);
-                        }
-                      }}
-                      autoFocus
-                    />
-                  ) : (
-                    <span
-                      onDoubleClick={() => toggleTitleEdit(tab.eventKey)}
-                      style={{
-                        color: "inherit",
-                        textAlign: "inherit",
-                        flexGrow: "inherit",
-                        display: "inline",
-                        opacity: "1",
-                      }}
-                    >
-                      {isTabValid(
-                        index + 1,
-                        currentTestMode,
-                        traffic_gen_list
-                      ) ? (
-                        tab.title
-                      ) : (
-                        <div>
-                          <i className="bi bi-exclamation-triangle"></i>{" "}
-                          {tab.title}
-                        </div>
-                      )}
-                    </span>
-                  )}
-
-                  {tab.eventKey !== "tab-1" ? (
-                    <button
-                      className="outline-none border-0 bg-transparent"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteTab(tab.eventKey);
-                      }}
-                    >
-                      <i className="bi bi-x"></i>
-                    </button>
-                  ) : (
-                    <></>
-                  )}
-                </div>
-              ) : (
-                tab.title
-              )
+      {currentTestMode !== TestMode.PROFILE ? (
+        <Tabs
+          onSelect={(k: string | null) => {
+            if (k === "add") {
+              addTab();
+            } else if (k) {
+              setKey(k);
+              setCurrentTabIndex(k.split("-")[1]);
+              setCurrentTest(traffic_gen_list[k.split("-")[1] as any]);
             }
-          >
-            <div style={{ marginTop: "20px" }}></div>
+          }}
+          activeKey={key}
+        >
+          {tabs.map((tab, index) => (
+            <Tab
+              key={tab.eventKey}
+              eventKey={tab.eventKey}
+              title={
+                tab.eventKey !== "add" ? (
+                  <div className="d-flex align-items-center">
+                    {tab.titleEditable ? (
+                      <input
+                        type="text"
+                        value={tab.title}
+                        onChange={(e) =>
+                          handleTitleChange(tab.eventKey, e.target.value)
+                        }
+                        onBlur={() => toggleTitleEdit(tab.eventKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            toggleTitleEdit(tab.eventKey);
+                          }
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() => toggleTitleEdit(tab.eventKey)}
+                        style={{
+                          color: "inherit",
+                          textAlign: "inherit",
+                          flexGrow: "inherit",
+                          display: "inline",
+                          opacity: "1",
+                        }}
+                      >
+                        {isTabValid(
+                          index + 1,
+                          currentTestMode,
+                          traffic_gen_list
+                        ) ? (
+                          tab.title
+                        ) : (
+                          <div>
+                            <i className="bi bi-exclamation-triangle"></i>{" "}
+                            {tab.title}
+                          </div>
+                        )}
+                      </span>
+                    )}
 
-            <Row>
-              <Col className={"col-2"}>
-                <Form.Text className="text-muted">
-                  {translate("Generation Mode", currentLanguage)}
-                </Form.Text>
-              </Col>
-              {currentTestMode === TestMode.MULTI ? (
+                    {tab.eventKey !== "tab-1" ? (
+                      <button
+                        className="outline-none border-0 bg-transparent"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTab(tab.eventKey);
+                        }}
+                      >
+                        <i className="bi bi-x"></i>
+                      </button>
+                    ) : (
+                      <></>
+                    )}
+                  </div>
+                ) : (
+                  tab.title
+                )
+              }
+            >
+              <div style={{ marginTop: "20px" }}></div>
+
+              <Row>
                 <Col className={"col-2"}>
                   <Form.Text className="text-muted">
-                    {translate("Enter Test Duration", currentLanguage)}
+                    {translate("Generation Mode", currentLanguage)}
                   </Form.Text>
                 </Col>
-              ) : (
-                <></>
-              )}
-            </Row>
+                {currentTestMode === TestMode.MULTI ? (
+                  <Col className={"col-2"}>
+                    <Form.Text className="text-muted">
+                      {translate("Enter Test Duration", currentLanguage)}
+                    </Form.Text>
+                  </Col>
+                ) : (
+                  <></>
+                )}
+              </Row>
 
-            <Row className="align-items-end">
-              <GenerationModeSelection
+              <Row className="align-items-end">
+                <GenerationModeSelection
+                  {...{
+                    currentLanguage,
+                    currentTest,
+                    handleModeChange,
+                    running,
+                  }}
+                />
+                <Col className={"col-3 d-flex flex-row align-items-center"}>
+                  {currentTestMode === TestMode.MULTI && (
+                    <>
+                      <Form onChange={handleDurationChange}>
+                        <Form.Control
+                          type="number"
+                          min={0}
+                          placeholder={translate(
+                            "Number of seconds",
+                            currentLanguage
+                          )}
+                          value={currentTest?.duration}
+                          required
+                        />
+                      </Form>
+                    </>
+                  )}
+                </Col>
+              </Row>
+
+              <StreamTable
                 {...{
-                  currentLanguage,
-                  currentTest,
-                  handleModeChange,
+                  removeStream,
                   running,
+                  currentTest,
                 }}
               />
-              <Col className={"col-3 d-flex flex-row align-items-center"}>
-                {currentTestMode === TestMode.MULTI && (
-                  <>
-                    <Form onChange={handleDurationChange}>
-                      <Form.Control
-                        type="number"
-                        min={0}
-                        placeholder={translate(
-                          "Number of seconds",
-                          currentLanguage
-                        )}
-                        value={currentTest?.duration}
-                        required
-                      />
-                    </Form>
-                  </>
-                )}
-              </Col>
-            </Row>
 
-            <StreamTable
-              {...{
-                removeStream,
-                running,
-                currentTest,
-              }}
-            />
+              <AddStreamButton
+                {...{
+                  addStream,
+                  running,
+                  currentTest,
+                }}
+              />
 
-            <AddStreamButton
-              {...{
-                addStream,
-                running,
-                currentTest,
-              }}
-            />
-
-            <PortMappingTable
-              {...{
-                ports,
-                running,
-                handlePortChange,
-                currentTest,
-              }}
-            />
-            <SaveResetButtons onSave={save} onReset={reset} running={running} />
-          </Tab>
-        ))}
-      </Tabs>
+              <PortMappingTable
+                {...{
+                  ports,
+                  running,
+                  handlePortChange,
+                  currentTest,
+                }}
+              />
+              <SaveResetButtons
+                onSave={save}
+                onReset={reset}
+                running={running}
+              />
+            </Tab>
+          ))}
+        </Tabs>
+      ) : (
+        <Profiles />
+      )}
       <input
         style={{ display: "none" }}
         accept=".json"

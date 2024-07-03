@@ -76,6 +76,8 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
 
             // Save statistics if multi test is running
             if number_of_tests > 1 {
+            // Different counts have to be synchronized
+             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
              if let Err(err) = save_statistics(Arc::clone(&state_clone), i).await {
                 error!("Failed to save the statistics of the current test {}: {}", i, err);
                 return;

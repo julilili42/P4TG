@@ -130,6 +130,9 @@ pub struct TrafficGenData {
     /// Optional duration for each traffic generation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) duration: Option<u64>,
+    /// Optional test name for each traffic generation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) name: Option<String>,
     /// Optional all traffic configurations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) all_test: Option<BTreeMap<u32, TrafficGenData>>

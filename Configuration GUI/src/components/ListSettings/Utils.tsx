@@ -96,6 +96,7 @@ const TestModeSelection = ({
     <Form.Select value={currentTestMode} onChange={handleTestModeChange}>
       <option value={TestMode.SINGLE}>Standard</option>
       <option value={TestMode.MULTI}>Automatic tests</option>
+      <option value={TestMode.PROFILE}>Profile</option>
     </Form.Select>
   </Col>
 );

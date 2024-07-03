@@ -176,6 +176,7 @@ export enum GenerationMode {
 export enum TestMode {
   SINGLE = 0,
   MULTI = 1,
+  PROFILE = 2,
 }
 
 export interface Stream {
@@ -266,6 +267,7 @@ export interface TrafficGenData {
   stream_settings: StreamSettings[];
   port_tx_rx_mapping: { [name: number]: number };
   duration?: number;
+  name?: string;
 }
 
 export interface TrafficGenList {

@@ -69,6 +69,14 @@ pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
             None
         };
 
+        // Extract the name from the current test data
+        let name = if let Some(test_data) = all_test_list.first() {
+            test_data.name.clone()
+        } else {
+            None
+        };
+
+
 
 
         let tg_data = TrafficGenData {
@@ -77,6 +85,7 @@ pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
             streams: tg.streams.clone(),
             port_tx_rx_mapping: tg.port_mapping.clone(),
             duration: None,
+            name,
             all_test: all_test_value
         };
 

@@ -7,26 +7,46 @@ import { TrafficGenList, Stream, StreamSettings } from "../common/Interfaces";
 const Download = ({
   data,
   stats,
-  portTxRxMappingList,
-  modeList,
-  streamsList,
-  streamSettingsList,
+  traffic_gen_list,
   graph_images,
 }: {
   data: TimeStatistics;
-  stats: {
-    [key: number]: Statistics;
-  };
-  portTxRxMappingList: {
-    [key: number]: { [name: number]: number };
-  };
-  modeList: { [key: number]: number };
-  streamsList: { [key: number]: Stream[] };
-  streamSettingsList: {
-    [key: number]: StreamSettings[];
-  };
+  stats: Statistics;
+  traffic_gen_list: TrafficGenList;
   graph_images: string[];
 }) => {
+  /* 
+    Hier bekomm ich stats, was das gesamte Statistics Objekt ist. 
+    Daher muss ich 
+    stats: {
+    [key: number]: Statistics;
+  };
+    zu
+    stats: Statistics;
+    ändern. 
+    DownloadCsv und DownloadPdf erhalten dieses Objekt und müssen entsprechend angepasst werden. => Tesmodus muss auch hier übergeben werden. 
+  */
+
+  //
+  const portTxRxMappingList = Object.fromEntries(
+    Object.entries(traffic_gen_list).map(([key, value]) => [
+      key,
+      value.port_tx_rx_mapping,
+    ])
+  );
+  const modeList = Object.fromEntries(
+    Object.entries(traffic_gen_list).map(([key, value]) => [key, value.mode])
+  );
+  const streamsList = Object.fromEntries(
+    Object.entries(traffic_gen_list).map(([key, value]) => [key, value.streams])
+  );
+  const streamSettingsList = Object.fromEntries(
+    Object.entries(traffic_gen_list).map(([key, value]) => [
+      key,
+      value.stream_settings,
+    ])
+  );
+
   // single
   const mode = Object.values(modeList).slice(-1)[0];
   const stream_settings = Object.values(streamSettingsList).slice(-1)[0];
@@ -49,29 +69,6 @@ const Download = ({
 
   const { handleDownloadPdf } = DownloadPdf(pdfButtonProps);
 
-  /* 
-portTxRxMappingList={Object.fromEntries(
-                          Object.entries(traffic_gen_list).map(
-                            ([key, value]) => [key, value.port_tx_rx_mapping]
-                          )
-                        )}
-                        modeList={Object.fromEntries(
-                          Object.entries(traffic_gen_list).map(
-                            ([key, value]) => [key, value.mode]
-                          )
-                        )}
-                        streamsList={Object.fromEntries(
-                          Object.entries(traffic_gen_list).map(
-                            ([key, value]) => [key, value.streams]
-                          )
-                        )}
-                        streamSettingsList={Object.fromEntries(
-                          Object.entries(traffic_gen_list).map(
-                            ([key, value]) => [key, value.stream_settings]
-                          )
-                        )}
-                        
-   */
   return (
     <div style={{ position: "absolute", width: "100%" }}>
       <Dropdown>
@@ -86,10 +83,7 @@ portTxRxMappingList={Object.fromEntries(
           >
             <i className="bi bi-filetype-pdf"></i> PDF
           </Dropdown.Item>
-          <Dropdown.Item
-            onClick={handleDownloadCsv}
-            className="custom-dropdown-item"
-          >
+          <Dropdown.Item active={false} className="custom-dropdown-item">
             <i className="bi bi-filetype-csv"></i> CSV
           </Dropdown.Item>
         </Dropdown.Menu>
