@@ -171,7 +171,7 @@ export const addHeadersAndFooters = (
   }
 };
 
-export const addSubHeaders = (doc: jsPDF, subHeaders: string[][]) => {
+export const addSubHeaders = (doc: jsPDF, subHeaders: string[]) => {
   let currentPage = 1;
 
   // Add Subheaders to every page

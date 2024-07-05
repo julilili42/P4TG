@@ -1,6 +1,7 @@
 import { Dropdown } from "react-bootstrap";
 import DownloadCsv from "./csv/Csv";
-import DownloadPdf from "./pdf/Pdf";
+import DownloadPdf from "./pdf/Pdf2";
+
 import { Statistics, TimeStatistics } from "../common/Interfaces";
 import { TrafficGenList, Stream, StreamSettings } from "../common/Interfaces";
 
@@ -13,7 +14,9 @@ const Download = ({
   data: TimeStatistics;
   stats: Statistics;
   traffic_gen_list: TrafficGenList;
-  graph_images: string[];
+  graph_images: {
+    [key: number]: { Summary: string[]; [key: string]: string[] };
+  };
 }) => {
   /* 
     Hier bekomm ich stats, was das gesamte Statistics Objekt ist. 
@@ -28,7 +31,8 @@ const Download = ({
   */
 
   //
-  const portTxRxMappingList = Object.fromEntries(
+
+  /* const portTxRxMappingList = Object.fromEntries(
     Object.entries(traffic_gen_list).map(([key, value]) => [
       key,
       value.port_tx_rx_mapping,
@@ -52,18 +56,15 @@ const Download = ({
   const stream_settings = Object.values(streamSettingsList).slice(-1)[0];
   const streams = Object.values(streamsList).slice(-1)[0];
   const port_mapping = Object.values(portTxRxMappingList).slice(-1)[0];
-  const statistics = Object.values(stats).slice(-1)[0];
+  const statistics = Object.values(stats).slice(-1)[0]; 
 
   const csvButtonProps = { data, stats: statistics, port_mapping };
 
   const { handleDownloadCsv } = DownloadCsv(csvButtonProps);
-
+*/
   const pdfButtonProps = {
-    stats: statistics,
-    port_mapping,
-    mode,
-    streams,
-    stream_settings,
+    stats,
+    traffic_gen_list,
     graph_images,
   };
 

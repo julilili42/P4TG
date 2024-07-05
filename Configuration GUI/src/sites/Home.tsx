@@ -27,7 +27,7 @@ import {
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
 import translate from "../components/translation/Translate";
-import HiddenGraphs from "../components/pdf/HiddenVisuals";
+import HiddenGraphs from "../components/pdf/HiddenVisuals2";
 import Download from "../components/Download";
 
 import {
@@ -65,7 +65,9 @@ const Home = () => {
   const [running, set_running] = useState(false);
   const [visual, set_visual] = useState(true);
 
-  const [imageData, setImageData] = useState<string[]>([]);
+  const [imageData, setImageData] = useState<{
+    [key: number]: { Summary: string[]; [key: string]: string[] };
+  }>({});
 
   const [test_mode, set_test_mode] = useState(
     parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
@@ -77,8 +79,6 @@ const Home = () => {
 
   const [statistics, set_statistics] =
     useState<StatInterface>(StatisticsObject);
-  const [previous_statistics, set_previous_statistics] =
-    useState<PreviousStatistics>({ "1": StatisticsObject });
   const [time_statistics, set_time_statistics] =
     useState<TimeStatistics>(TimeStatisticsObject);
 
@@ -326,11 +326,42 @@ const Home = () => {
     running: boolean,
     statistics: TimeStatistics
   ) => {
-    return !running && Object.keys(statistics.tx_rate_l1).length > 0;
+    return (
+      !running &&
+      Object.keys(statistics.tx_rate_l1).length > 0 &&
+      currentTestNumber === totalTestsNumber
+    );
   };
 
   const handleGraphConvert = (newImageData: string[]) => {
-    setImageData(newImageData);
+    const newImageMap: {
+      [key: number]: { Summary: string[]; [key: string]: string[] };
+    } = {};
+
+    let currentIndex = 0;
+
+    Object.keys(traffic_gen_list).forEach((testId) => {
+      const portMapping = traffic_gen_list[testId as any].port_tx_rx_mapping;
+      const portPairs = activePorts(portMapping);
+
+      // Initialize the test entry with the summary
+      newImageMap[Number(testId)] = {
+        Summary: newImageData.slice(currentIndex, currentIndex + 6),
+      };
+      currentIndex += 6;
+
+      // Add port pair data
+      portPairs.forEach((pair, index) => {
+        const portPairKey = `${pair.tx}`;
+        newImageMap[Number(testId)][portPairKey] = newImageData.slice(
+          currentIndex,
+          currentIndex + 6
+        );
+        currentIndex += 6;
+      });
+    });
+
+    setImageData(newImageMap);
   };
 
   const handleSelectTest = (testNumber: number) => {
@@ -384,25 +415,14 @@ const Home = () => {
                       {translate("Reset", currentLanguage)}{" "}
                     </Button>{" "}
                   </div>
-                  {shouldShowDownloadButton(running, time_statistics) ? (
+                  {shouldShowDownloadButton(running, time_statistics) && (
                     <>
                       <HiddenGraphs
                         data={time_statistics}
                         stats={statistics}
-                        port_mapping={
-                          traffic_gen_list[currentTestNumber]
-                            ?.port_tx_rx_mapping || {}
-                        }
+                        traffic_gen_list={traffic_gen_list}
                         onConvert={handleGraphConvert}
                       />
-                      {/* 
-                      Ich sollte hier immer statistics übergeben.  
-                      Die Fallunterscheidung 
-                      - Testmode Single: statistics
-                      - Testmode Multi: statistics.previous_statistics
-                      treff ich dann in der Download Komponente.
-                      Daher müsste ich auch den Testmode übergeben.
-                      */}
                       <Download
                         data={time_statistics}
                         stats={statistics}
@@ -410,8 +430,6 @@ const Home = () => {
                         graph_images={imageData}
                       />
                     </>
-                  ) : (
-                    <></>
                   )}
                 </div>
               </>
