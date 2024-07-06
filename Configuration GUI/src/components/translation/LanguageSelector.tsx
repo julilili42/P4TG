@@ -48,7 +48,7 @@ const Selector: React.FC = () => {
 
   return (
     <Row className="mb-3">
-      <Col className="text-center col-12 mt-3">
+      <Col className="text-center col-12 mt-1">
         <Dropdown
           show={isOpen}
           onToggle={() => setIsOpen(!isOpen)}

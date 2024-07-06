@@ -1,11 +1,13 @@
-import styled from "styled-components";
 import Accordion from "react-bootstrap/Accordion";
 import { Button } from "react-bootstrap";
 import { useEffect, useState } from "react";
 import { get } from "../../common/API";
+import { TrafficGenData } from "../../common/Interfaces";
 
 const Profiles = () => {
-  const [profiles, set_profiles] = useState([]);
+  const [profiles, set_profiles] = useState<{ [key: string]: TrafficGenData }>(
+    {}
+  );
 
   const loadProfiles = async () => {
     let profiles = await get({ route: "/profiles" });
@@ -20,12 +22,17 @@ const Profiles = () => {
   });
 
   const saveProfile = (profileName: string) => {
-    if (profileName === "RFC 2544") {
-      localStorage.setItem("traffic_gen", JSON.stringify(profiles));
-      localStorage.setItem("test-mode", String(3));
+    console.log(profiles);
+    if (profiles && profiles[profileName as keyof typeof profiles]) {
+      const trafficGen = {
+        "1": profiles[profileName as keyof typeof profiles],
+      };
+      localStorage.setItem("traffic_gen", JSON.stringify(trafficGen));
+      localStorage.setItem("test-mode", String(2));
 
       alert(`${profileName} settings have been saved.`);
-    } else if (profileName === "IMIX") {
+    } else {
+      alert(`Profile ${profileName} not found.`);
     }
   };
 
@@ -67,7 +74,7 @@ const Profiles = () => {
               conditions, providing insights for improvements. Select 'Save' to
               activate the IMIX profile and simulate real-world network traffic.
             </div>
-            <Button variant="primary">
+            <Button variant="primary" onClick={() => saveProfile("IMIX")}>
               <i className="bi bi-check" /> Save
             </Button>
           </Accordion.Body>

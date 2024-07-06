@@ -270,6 +270,30 @@ export interface TrafficGenData {
   name?: string;
 }
 
+export const DefaultTrafficGenData = (
+  ports: {
+    pid: number;
+    port: number;
+    channel: number;
+    loopback: string;
+    status: boolean;
+  }[]
+) => {
+  const initialStreamSettings = ports
+    .filter((v) => v.loopback === "BF_LPBK_NONE")
+    .map((v) => {
+      const settings = DefaultStreamSettings(1, v.pid);
+      return settings;
+    });
+
+  return {
+    mode: GenerationMode.CBR,
+    streams: [DefaultStream(1)],
+    stream_settings: initialStreamSettings,
+    port_tx_rx_mapping: {},
+  };
+};
+
 export interface TrafficGenList {
   [testId: number]: TrafficGenData;
 }

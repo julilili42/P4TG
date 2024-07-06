@@ -8,6 +8,7 @@ import {
   TestMode,
   TrafficGenData,
   TrafficGenList,
+  DefaultTrafficGenData,
 } from "../../common/Interfaces";
 import Loader from "../Loader";
 import { GitHub } from "../../sites/Home";
@@ -121,14 +122,18 @@ const ListSettings = () => {
     const test = trafficGenList[index];
 
     if (!test) {
-      return false;
+      return { valid: false, reason: "Test not found" };
     }
 
-    if (currentTestMode === TestMode.MULTI) {
-      return test.duration !== 0 && !isEmptyObject(test.port_tx_rx_mapping);
-    } else {
-      return !isEmptyObject(test.port_tx_rx_mapping);
+    if (isEmptyObject(test.port_tx_rx_mapping)) {
+      return { valid: false, reason: "Port TX/RX mapping is empty" };
     }
+
+    if (currentTestMode === TestMode.MULTI && test.duration === 0) {
+      return { valid: false, reason: "Duration is zero" };
+    }
+
+    return { valid: true, reason: "" };
   };
 
   const initializeTabs = () => {
@@ -292,6 +297,15 @@ const ListSettings = () => {
 
     if (stats.status === 200) {
       set_ports(stats.data);
+      if (Object.keys(traffic_gen_list).length === 0) {
+        const defaultData = DefaultTrafficGenData(stats.data);
+        set_traffic_gen_list({ 1: defaultData });
+        localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
+        window.location.reload();
+      }
+      if (!localStorage.getItem("test-mode")) {
+        localStorage.setItem("test-mode", String(TestMode.SINGLE));
+      }
     }
   };
 
@@ -323,6 +337,18 @@ const ListSettings = () => {
 
   const save = () => {
     if (currentTabIndex && currentTest) {
+      const { valid, reason } = isTabValid(
+        parseInt(currentTabIndex),
+        currentTestMode,
+        traffic_gen_list
+      );
+
+      if (!valid) {
+        alert(
+          `The selected test is not valid.\nReason: ${reason}.\nSettings could not be saved`
+        );
+        return;
+      }
       const updatedTest: TrafficGenData = {
         streams: currentTest.streams,
         stream_settings: currentTest.stream_settings,
@@ -472,6 +498,10 @@ const ListSettings = () => {
       ? 0
       : parseInt(event.target.value);
 
+    if (newDuration < 0) {
+      return;
+    }
+
     const updatedTest: TrafficGenData = {
       ...currentTest,
       duration: newDuration,
@@ -516,6 +546,25 @@ const ListSettings = () => {
     ref.current.click();
   };
 
+  const isTrafficGenData = (data: any): data is TrafficGenData => {
+    return (
+      data &&
+      typeof data === "object" &&
+      "streams" in data &&
+      "stream_settings" in data &&
+      "port_tx_rx_mapping" in data &&
+      "mode" in data
+    );
+  };
+
+  const isTrafficGenList = (data: any): data is TrafficGenList => {
+    if (typeof data !== "object" || data === null) return false;
+    for (const key in data) {
+      if (!isTrafficGenData(data[key])) return false;
+    }
+    return true;
+  };
+
   const loadSettings = (e: any) => {
     e.preventDefault();
 
@@ -523,7 +572,18 @@ const ListSettings = () => {
     fileReader.readAsText(e.target.files[0], "UTF-8");
 
     fileReader.onload = (e: any) => {
-      let data: TrafficGenList = JSON.parse(e.target.result);
+      let data: any = JSON.parse(e.target.result);
+
+      if (isTrafficGenData(data)) {
+        data = { 1: data };
+      }
+
+      if (!isTrafficGenList(data)) {
+        alert(translate("Settings not valid.", currentLanguage));
+        // @ts-ignore
+        ref.current.value = "";
+        return;
+      }
 
       for (const key in data) {
         if (
@@ -698,18 +758,21 @@ const ListSettings = () => {
                           opacity: "1",
                         }}
                       >
-                        {isTabValid(
-                          index + 1,
-                          currentTestMode,
-                          traffic_gen_list
-                        ) ? (
-                          tab.title
-                        ) : (
-                          <div>
-                            <i className="bi bi-exclamation-triangle"></i>{" "}
-                            {tab.title}
-                          </div>
-                        )}
+                        {(() => {
+                          const { valid } = isTabValid(
+                            index + 1,
+                            currentTestMode,
+                            traffic_gen_list
+                          );
+                          return valid ? (
+                            tab.title
+                          ) : (
+                            <div>
+                              <i className="bi bi-exclamation-triangle"></i>{" "}
+                              {tab.title}
+                            </div>
+                          );
+                        })()}
                       </span>
                     )}
 

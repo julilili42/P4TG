@@ -1,10 +1,13 @@
 use axum::Json;
 use crate::core::traffic_gen_core::types::*;
 use std::sync::Mutex;
+use std::collections::HashMap;
 
 lazy_static::lazy_static! {
-    static ref ProfilePayload: Mutex<Vec<TrafficGenData>> = Mutex::new(vec![
-        TrafficGenData {
+    static ref ProfilePayload: Mutex<HashMap<String, TrafficGenData>> = Mutex::new({
+        let mut map = HashMap::new();
+
+        let rfc2544 = TrafficGenData {
             mode: GenerationMode::Cbr,
             stream_settings: vec![
                 StreamSetting {
@@ -365,14 +368,385 @@ lazy_static::lazy_static! {
                 },
             ],
             port_tx_rx_mapping: vec![(128, 136)].into_iter().collect(),
-            duration: Some(60),
+            duration: Some(10),
             name: Some("RFC2544".to_string()),
             all_test: None,
-        },
-    ]);
+        };
+
+        let imix = TrafficGenData {
+            mode: GenerationMode::Cbr,
+            stream_settings: vec![
+                StreamSetting {
+                    port: 128,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: true,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 136,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 144,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 152,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 160,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 168,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 176,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 184,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 60,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+                StreamSetting {
+                    port: 52,
+                    stream_id: 1,
+                    vlan: Some(Vlan {
+                        vlan_id: 1,
+                        pcp: 0,
+                        dei: 0,
+                        inner_vlan_id: 1,
+                        inner_pcp: 0,
+                        inner_dei: 0,
+                    }),
+                    mpls_stack: None,
+                    ethernet: Ethernet {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                    },
+                    ip: IPv4 {
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        ip_src_mask: "0.0.0.0".parse().unwrap(),
+                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
+                    },
+                    active: false,
+                    vxlan: Some(VxLAN {
+                        eth_src: "32:D5:42:2A:F6:92".to_string(),
+                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
+                        ip_src: "192.168.178.10".parse().unwrap(),
+                        ip_dst: "192.168.178.11".parse().unwrap(),
+                        ip_tos: 0,
+                        udp_source: 49152,
+                        vni: 1,
+                    }),
+                },
+            ],
+            streams: vec![
+                Stream {
+                    stream_id: 1,
+                    app_id: 1,
+                    frame_size: 1024,
+                    encapsulation: Encapsulation::None,
+                    number_of_lse: None,
+                    traffic_rate: 1.0,
+                    burst: 1,
+                    n_packets: None,
+                    timeout: None,
+                    generation_accuracy: None,
+                    n_pipes: None,
+                    vxlan: false,
+                },
+            ],
+            port_tx_rx_mapping: vec![(128, 136)].into_iter().collect(),
+            duration: Some(5),
+            name: Some("IMIX".to_string()),
+            all_test: None,
+        };
+
+        map.insert("RFC 2544".to_string(), rfc2544);
+        map.insert("IMIX".to_string(), imix);
+        
+        map
+    });
 }
 
-pub async fn profiles_handler() -> Json<Vec<TrafficGenData>> {
+pub async fn profiles_handler() -> Json<HashMap<String, TrafficGenData>> {
     let payload = ProfilePayload.lock().unwrap();
     Json(payload.clone())
 }

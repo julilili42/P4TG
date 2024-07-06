@@ -22,7 +22,7 @@ import {
   TimeStatisticsObject,
   TrafficGenData,
   TrafficGenList,
-  PreviousStatistics,
+  DefaultTrafficGenData,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
@@ -35,6 +35,7 @@ import {
   getStreamFrameSize,
   getStreamIDsByPort,
 } from "../common/utils/StatisticUtils";
+import { getPortAndChannelFromPid } from "../common/utils/PdfUtils";
 
 const StyledLink = styled.a`
   color: var(--color-secondary);
@@ -97,6 +98,33 @@ const Home = () => {
   const [totalTestsNumber, setTotalTestsNumber] = useState<number>(1);
   const [currentTestDuration, setCurrentTestDuration] = useState<number>(0);
 
+  const [ports, set_ports] = useState<
+    {
+      pid: number;
+      port: number;
+      channel: number;
+      loopback: string;
+      status: boolean;
+    }[]
+  >([]);
+
+  const loadPorts = async () => {
+    let stats = await get({ route: "/ports" });
+
+    if (stats.status === 200) {
+      set_ports(stats.data);
+      if (Object.keys(traffic_gen_list).length === 0) {
+        const defaultData = DefaultTrafficGenData(stats.data);
+        set_traffic_gen_list({ 1: defaultData });
+        localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
+        window.location.reload();
+      }
+      if (!localStorage.getItem("test-mode")) {
+        localStorage.setItem("test-mode", String(TestMode.SINGLE));
+      }
+    }
+  };
+
   useEffect(() => {
     refresh();
 
@@ -143,6 +171,7 @@ const Home = () => {
     await loadGen();
     await loadStatistics();
     await loadTestInfo();
+    await loadPorts();
     set_loaded(true);
   };
 
@@ -200,7 +229,10 @@ const Home = () => {
                 mode: singleTest.mode,
               },
             });
-          } else if (test_mode === TestMode.MULTI) {
+          } else if (
+            test_mode === TestMode.MULTI ||
+            test_mode === TestMode.PROFILE
+          ) {
             const traffic_generations = Object.keys(traffic_gen_list).map(
               (test_number: any) => ({
                 streams: traffic_gen_list[test_number].streams,
@@ -313,6 +345,7 @@ const Home = () => {
   const reset = async () => {
     set_overlay(true);
     await get({ route: "/reset" });
+    set_traffic_gen_list({});
     set_overlay(false);
   };
 
@@ -449,25 +482,35 @@ const Home = () => {
             />
           </Form>
         </Col>
-        {running && test_mode === TestMode.MULTI ? (
-          <Col className={"col-auto"}>
-            <OverlayTrigger
-              placement="top"
-              overlay={
-                <Tooltip id="test-info-tooltip">
-                  Test {currentTestNumber} of {totalTestsNumber}
-                  <br />
-                  Duration {currentTestDuration} seconds
-                </Tooltip>
-              }
-            >
-              <i className="bi bi-info-circle" style={{ cursor: "pointer" }} />
-            </OverlayTrigger>{" "}
-            Test info
-          </Col>
-        ) : (
-          <></>
-        )}
+        {running &&
+          (test_mode === TestMode.MULTI || test_mode === TestMode.PROFILE) && (
+            <Col className={"col-auto"}>
+              <OverlayTrigger
+                placement="top"
+                overlay={
+                  test_mode === TestMode.MULTI ? (
+                    <Tooltip id="test-info-tooltip">
+                      Test {currentTestNumber} of {totalTestsNumber}
+                      <br />
+                      Duration {currentTestDuration} seconds
+                    </Tooltip>
+                  ) : (
+                    <Tooltip id="test-info-tooltip">
+                      {traffic_gen_list[1].name}
+                      <br />
+                      Duration {currentTestDuration} seconds
+                    </Tooltip>
+                  )
+                }
+              >
+                <i
+                  className="bi bi-info-circle"
+                  style={{ cursor: "pointer" }}
+                />
+              </OverlayTrigger>{" "}
+              Test info
+            </Col>
+          )}
       </Row>
       <Tabs
         defaultActiveKey="current"
@@ -495,7 +538,17 @@ const Home = () => {
             ).map((v, i) => {
               let mapping: { [name: number]: number } = { [v.tx]: v.rx };
               return (
-                <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
+                <Tab
+                  eventKey={i}
+                  key={i}
+                  title={
+                    v.tx +
+                    ` (${getPortAndChannelFromPid(v.tx, ports).port}) ` +
+                    "-> " +
+                    v.rx +
+                    ` (${getPortAndChannelFromPid(v.rx, ports).port}) `
+                  }
+                >
                   <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
                     <Tab eventKey={"Overview"} title={"Overview"}>
                       <StatView
@@ -571,7 +624,17 @@ const Home = () => {
                 ).map((v, i) => {
                   let mapping: { [name: number]: number } = { [v.tx]: v.rx };
                   return (
-                    <Tab eventKey={i} key={i} title={v.tx + "->" + v.rx}>
+                    <Tab
+                      eventKey={i}
+                      key={i}
+                      title={
+                        v.tx +
+                        ` (${getPortAndChannelFromPid(v.tx, ports).port}) ` +
+                        "-> " +
+                        v.rx +
+                        ` (${getPortAndChannelFromPid(v.rx, ports).port}) `
+                      }
+                    >
                       <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
                         <Tab eventKey={"Overview"} title={"Overview"}>
                           {selectedTest.statistics &&
