@@ -571,7 +571,7 @@ const DownloadPdf = ({
     });
 
     /* Add header and footer to every page */
-    addHeadersAndFooters(doc, elapsed_time, currentLanguage);
+    addHeadersAndFooters(doc, elapsed_time, "Test 1", currentLanguage);
     /*     addSubHeaders(doc, subHeaders);
      */
     doc.save("Network Report.pdf");

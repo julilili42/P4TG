@@ -52,7 +52,6 @@ export const generateLineData = (
     Object.values(ret_data),
   ];
 };
-
 export const frame_size_label = [
   "0-63",
   "64",

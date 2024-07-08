@@ -108,6 +108,7 @@ export const createTestExplanation = (
 export const addHeadersAndFooters = (
   doc: jsPDF,
   elapsed_time: number,
+  testName: string,
   currentLanguage: string
 ) => {
   const totalPages = doc.getNumberOfPages();
@@ -166,7 +167,9 @@ export const addHeadersAndFooters = (
     // P4TG Network Report Header
     doc.setFontSize(17);
     doc.setFont("helvetica", "bold");
-    doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+    doc.text("P4TG Network Report - " + testName, pageWidth / 2, 15, {
+      align: "center",
+    });
     doc.setFont("helvetica", "normal");
   }
 };

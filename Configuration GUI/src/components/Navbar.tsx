@@ -27,6 +27,7 @@ import { Row } from "react-bootstrap";
 import P4TGLogo from "../assets/p4tg_logo_white.png";
 import config from "../config";
 import Selector from "./translation/LanguageSelector";
+import ThemeBtn from "./ThemeToggle";
 styled(Link)<{ active?: boolean }>`
   text-decoration: none;
   margin-right: 15px;
@@ -110,9 +111,10 @@ const Navbar = () => {
         <NavLink to={"/tests"} text={""} icon={"bi bi-gear-wide-connected"} />
         <Row className="flex-grow-1"></Row>
         <Selector />
+        <ThemeBtn />
         <Row>
           <CNavItem className="flex-grow-1 mb-2">
-            <span>v2.2.1</span>
+            <span style={{ color: "var(--color-text)" }}>v2.2.1</span>
           </CNavItem>
         </Row>
       </CSidebarNav>

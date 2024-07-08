@@ -33,7 +33,6 @@ import {
   formatPortStreamCols,
   formatPortStreamRows,
   frameSizeCountRow,
-  createTableOfContents,
   createTestExplanation,
   addHeadersAndFooters,
   addSubHeaders,
@@ -170,6 +169,8 @@ const DownloadPdf = ({
   ) => {
     const current_test = testList[testNumber];
 
+    const test_name = current_test.name || `Test ${testNumber}`;
+
     const { mode, stream_settings, streams, port_tx_rx_mapping } = current_test;
 
     const current_statistics = stats.previous_statistics?.[testNumber] || stats;
@@ -213,10 +214,6 @@ const DownloadPdf = ({
     });
 
     subHeadersMap.current[testNumber] = subHeaders;
-
-    /* Table of Contents */
-    /*     createTableOfContents(doc, subHeaders, currentLanguage);
-     */
 
     /* Test explanation */
     createTestExplanation(doc, dummyText);
@@ -566,7 +563,7 @@ const DownloadPdf = ({
     });
 
     /* Add header and footer to every page */
-    addHeadersAndFooters(doc, elapsed_time, currentLanguage);
+    addHeadersAndFooters(doc, elapsed_time, test_name, currentLanguage);
     addSubHeaders(doc, subHeaders);
 
     return doc.output("arraybuffer");
@@ -575,6 +572,7 @@ const DownloadPdf = ({
   const createToC = (
     doc: jsPDF,
     subHeadersMap: { [key: number]: string[] },
+    testList: TrafficGenList,
     currentLanguage: string
   ) => {
     doc.setFont("helvetica", "normal");
@@ -587,12 +585,15 @@ const DownloadPdf = ({
     let yPosition = 40;
 
     Object.keys(subHeadersMap).forEach((testNumber) => {
+      const testId = parseInt(testNumber);
+      const testName = testList[testId].name || `Test ${testId}`;
+
       if (yPosition > 290) {
         yPosition = 40;
         doc.addPage();
       }
 
-      doc.text(`Test ${parseInt(testNumber)}`, startX, yPosition);
+      doc.text(testName, startX, yPosition);
       yPosition += 10;
 
       const subHeaders = subHeadersMap[testNumber as any];
@@ -603,15 +604,12 @@ const DownloadPdf = ({
           " " +
           (currentPage + subIndex + 1).toString();
 
-        // Add the chapter title
         doc.text(title, startX, yPosition);
 
-        // Add the page number
         doc.setFont("helvetica", "bold");
         doc.text(pageNumberText, targetX + buffer, yPosition);
         doc.setFont("helvetica", "normal");
 
-        // Calculate and add the dots with buffer space
         const textWidth = doc.getTextWidth(title);
         const dots = addDots(doc, title, targetX, startX, buffer);
         doc.text(dots, startX + textWidth + buffer, yPosition);
@@ -620,7 +618,7 @@ const DownloadPdf = ({
         if (yPosition > 290) {
           yPosition = 40;
           doc.addPage();
-          currentPage += subIndex + 1; // Adjust currentPage if a new page is added
+          currentPage += subIndex + 1;
         }
       });
 
@@ -669,7 +667,7 @@ const DownloadPdf = ({
 
     // Erstelle ein Inhaltsverzeichnis
     const tocDoc = new jsPDF("p", "mm", [297, 210]);
-    createToC(tocDoc, subHeadersMap.current, currentLanguage);
+    createToC(tocDoc, subHeadersMap.current, traffic_gen_list, currentLanguage);
     const tocPdfBuffer = tocDoc.output("arraybuffer");
 
     // Füge das Inhaltsverzeichnis zu den PDFs hinzu
