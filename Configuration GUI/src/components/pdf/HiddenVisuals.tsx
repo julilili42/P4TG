@@ -1,19 +1,23 @@
-import React, { act, useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { Doughnut, Line } from "react-chartjs-2";
-import { Statistics, TimeStatistics } from "../../common/Interfaces";
+import {
+  Statistics,
+  TimeStatistics,
+  TrafficGenList,
+} from "../../common/Interfaces";
 
 import { activePorts } from "../../common/utils/StatisticUtils";
 import {
-  rtt_options,
-  frame_options,
-  loss_options,
-  rate_options,
+  get_loss_options,
   get_frame_size_data,
   get_rtt_data,
   get_loss_data,
   get_rate_data,
   get_frame_type_data,
   get_ethernet_type_data,
+  get_rate_options,
+  get_rtt_options,
+  get_frame_options,
 } from "../../common/utils/VisualUtils";
 
 type ChartRef = React.RefObject<HTMLDivElement>;
@@ -25,24 +29,30 @@ const createRefArray = (length: number): ChartRef[] => {
 const HiddenGraphs = ({
   data,
   stats,
-  port_mapping,
+  traffic_gen_list,
   onConvert,
 }: {
   data: TimeStatistics;
   stats: Statistics;
-  port_mapping: { [name: number]: number };
+  traffic_gen_list: TrafficGenList;
   onConvert: (data: string[]) => void;
 }) => {
-  // References to the summary graphs
-  const refsSummary = useRef<ChartRef[]>(createRefArray(6));
+  // References for all tests
+  const allRefs = useRef(
+    Object.keys(traffic_gen_list).reduce((acc, testId) => {
+      // Summary refs
+      const refsSummary = createRefArray(6);
 
-  // References to the active port graphs, Object
-  const activePortRefs = activePorts(port_mapping).reduce(
-    (acc, port, index) => {
-      acc[port.tx] = createRefArray(6);
+      // Active port refs
+      const port_mapping = traffic_gen_list[testId as any].port_tx_rx_mapping;
+      const activePortRefs = activePorts(port_mapping).reduce((acc, port) => {
+        acc[port.tx] = createRefArray(6);
+        return acc;
+      }, {} as { [key: number]: ChartRef[] });
+
+      acc[testId as any] = { refsSummary, activePortRefs };
       return acc;
-    },
-    {} as { [key: number]: ChartRef[] }
+    }, {} as { [key: number]: { refsSummary: ChartRef[]; activePortRefs: { [key: number]: ChartRef[] } } })
   );
 
   const download = useCallback(
@@ -50,6 +60,7 @@ const HiddenGraphs = ({
       const data: string[] = [];
 
       refs.forEach((ref: any, index: number) => {
+        console.log("downloaded " + (index + 1) + "th chart");
         const link = document.createElement("a");
         link.download = `chart-${index + 1}.png`;
         if (ref.current) {
@@ -57,7 +68,7 @@ const HiddenGraphs = ({
           link.href = ref.current.toBase64Image();
           data.push(link.href);
         } else {
-          console.error("Error in rendering" + index + 1 + "th chart");
+          console.error("Error in rendering" + (index + 1) + "th chart");
         }
       });
 
@@ -66,32 +77,59 @@ const HiddenGraphs = ({
     [onConvert]
   );
 
+  const firstRenderRef = useRef(true);
+
   useEffect(() => {
-    const allRefs = [
-      ...Object.values(activePortRefs).flat(),
-      ...refsSummary.current,
-    ];
-    download(allRefs);
-  }, []);
+    if (firstRenderRef.current) {
+      firstRenderRef.current = false;
+      const allTestRefs = Object.values(allRefs.current).reduce(
+        (acc, { refsSummary, activePortRefs }) => {
+          return acc.concat(
+            ...refsSummary,
+            ...Object.values(activePortRefs).flat()
+          );
+        },
+        [] as ChartRef[]
+      );
+      download(allTestRefs);
+    }
+  });
 
   return (
     <>
-      {activePorts(port_mapping).map((v, i) => {
+      {Object.keys(traffic_gen_list).map((testId) => {
+        const { refsSummary, activePortRefs } =
+          allRefs.current[parseInt(testId)];
+        const port_mapping =
+          traffic_gen_list[parseInt(testId)].port_tx_rx_mapping;
+
+        // Verwende die entsprechenden previous_statistics und previous_time_statistics, falls vorhanden
+        const currentData =
+          data.previous_time_statistics?.[parseInt(testId)] || data;
+        const currentStats =
+          stats.previous_statistics?.[parseInt(testId)] || stats;
+
         return (
-          <HiddenGraph
-            data={data}
-            stats={stats}
-            port_mapping={{ [v.tx]: v.rx }}
-            chartRefs={activePortRefs[v.tx]}
-          />
+          <div key={testId}>
+            <HiddenGraph
+              key={`summary-${testId}`}
+              data={currentData}
+              stats={currentStats}
+              port_mapping={port_mapping}
+              chartRefs={refsSummary}
+            />
+            {activePorts(port_mapping).map((v) => (
+              <HiddenGraph
+                key={`port-${v.tx}`}
+                data={currentData}
+                stats={currentStats}
+                port_mapping={{ [v.tx]: v.rx }}
+                chartRefs={activePortRefs[v.tx]}
+              />
+            ))}
+          </div>
         );
       })}
-      <HiddenGraph
-        data={data}
-        stats={stats}
-        port_mapping={port_mapping}
-        chartRefs={refsSummary.current}
-      />
     </>
   );
 };
@@ -116,6 +154,8 @@ const HiddenGraph = ({
     frameSizeChartRef,
   ] = chartRefs;
 
+  const loss_options = get_loss_options("light");
+
   const loss_options_hidden = {
     ...loss_options,
     aspectRatio: 5,
@@ -126,6 +166,10 @@ const HiddenGraph = ({
 
   const loss_data = get_loss_data(data, port_mapping);
 
+  const rate_data = get_rate_data(data, port_mapping);
+
+  const rate_options = get_rate_options("light");
+
   const rate_options_hidden = {
     ...rate_options,
     aspectRatio: 5,
@@ -134,7 +178,7 @@ const HiddenGraph = ({
     },
   };
 
-  const rate_data = get_rate_data(data, port_mapping);
+  const rtt_options = get_rtt_options("light");
 
   const rtt_options_hidden = {
     ...rtt_options,
@@ -145,6 +189,8 @@ const HiddenGraph = ({
   };
 
   const rtt_data = get_rtt_data(data, port_mapping);
+
+  const frame_options = get_frame_options("light");
 
   const frame_options_hidden = {
     ...frame_options,

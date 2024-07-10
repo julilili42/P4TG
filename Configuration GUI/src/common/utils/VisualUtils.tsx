@@ -125,44 +125,66 @@ export const get_frame_size_data = (
   };
   return frame_size_data;
 };
-export const rtt_options = {
-  responsive: true,
-  aspectRatio: 6,
-  scales: {
-    y: {
+export const get_rtt_options = (theme: string) => {
+  const color = theme === "dark" ? "rgb(200, 200, 200)" : undefined;
+  return {
+    responsive: true,
+    aspectRatio: 6,
+    scales: {
+      y: {
+        title: {
+          display: true,
+          text: "μs",
+          color: color,
+        },
+        ticks: {
+          color: color,
+        },
+        grid: {
+          color: color,
+        },
+        suggestedMin: 0,
+        beginAtZero: true,
+      },
+      x: {
+        title: {
+          display: true,
+          text: "Time",
+          color: color,
+        },
+        ticks: {
+          source: "auto",
+          autoSkip: true,
+          color: color,
+        },
+        grid: {
+          color: color,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        position: "top" as const,
+        labels: {
+          color: color,
+        },
+      },
       title: {
-        display: true,
-        text: "μs",
-      },
-      suggestedMin: 0,
-      beginAtZero: true,
-    },
-    x: {
-      title: {
-        display: true,
-        text: "Time",
-      },
-      ticks: {
-        source: "auto",
-        autoSkip: true,
+        display: false,
+        text: "",
       },
     },
-  },
-  plugins: {
-    legend: {
-      position: "top" as const,
-    },
-    title: {
-      display: false,
-      text: "",
-    },
-  },
+  };
 };
 export const get_rtt_data = (
   data: TimeStatistics,
-  port_mapping: { [name: number]: number }
+  port_mapping: { [name: number]: number },
+  theme = "light"
 ) => {
   const [labels_rtt, line_data_rtt] = get_rtt(data, port_mapping);
+  const backgroundColorRTT =
+    theme === "dark" ? "rgba(53, 162, 235, 0.25)" : "rgba(53, 162, 235, 0.5)";
+
   const rtt_data = {
     labels: labels_rtt,
     datasets: [
@@ -171,48 +193,68 @@ export const get_rtt_data = (
         label: "RTT",
         data: line_data_rtt.map((val) => val * 10 ** -3),
         borderColor: "rgb(53, 162, 235)",
-        backgroundColor: "rgba(53, 162, 235, 0.5)",
+        backgroundColor: backgroundColorRTT,
       },
     ],
   };
   return rtt_data;
 };
-export const loss_options = {
-  responsive: true,
-  aspectRatio: 6,
-  scales: {
-    y: {
+export const get_loss_options = (theme: string) => {
+  const color = theme === "dark" ? "rgb(200, 200, 200)" : undefined;
+
+  return {
+    responsive: true,
+    aspectRatio: 6,
+    scales: {
+      y: {
+        title: {
+          display: true,
+          text: "#Packets",
+          color: color,
+        },
+        ticks: {
+          color: color,
+        },
+        suggestedMin: 0,
+        beginAtZero: true,
+        grid: {
+          color: color,
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text: "Time",
+          color: color,
+        },
+        ticks: {
+          source: "auto",
+          autoSkip: true,
+          color: color,
+        },
+        grid: {
+          color: color,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        position: "top" as const,
+        labels: {
+          color: color,
+        },
+      },
       title: {
-        display: true,
-        text: "#Packets",
-      },
-      suggestedMin: 0,
-      beginAtZero: true,
-    },
-    x: {
-      title: {
-        display: true,
-        text: "Time",
-      },
-      ticks: {
-        source: "auto",
-        autoSkip: true,
+        display: false,
+        text: "",
       },
     },
-  },
-  plugins: {
-    legend: {
-      position: "top" as const,
-    },
-    title: {
-      display: false,
-      text: "",
-    },
-  },
+  };
 };
 export const get_loss_data = (
   data: TimeStatistics,
-  port_mapping: { [name: number]: number }
+  port_mapping: { [name: number]: number },
+  theme = "light"
 ) => {
   const [labels_loss, line_data_loss] = generateLineData(
     "packet_loss",
@@ -227,6 +269,11 @@ export const get_loss_data = (
     port_mapping
   );
 
+  const backgroundColorDataLoss =
+    theme === "dark" ? "rgba(53, 162, 235, 0.25)" : "rgba(53, 162, 235, 0.5)";
+  const backgroundColorOutOfOrder =
+    theme === "dark" ? "rgba(250,122,64, 0.25)" : "rgba(250,122,64, 0.5)";
+
   const loss_data = {
     labels: labels_loss,
     datasets: [
@@ -235,55 +282,75 @@ export const get_loss_data = (
         label: "Packet loss",
         data: line_data_loss,
         borderColor: "rgb(53, 162, 235)",
-        backgroundColor: "rgba(53, 162, 235, 0.5)",
+        backgroundColor: backgroundColorDataLoss,
       },
       {
         fill: true,
         label: "Out of order",
         data: line_data_out_of_order,
         borderColor: "rgb(183,85,40)",
-        backgroundColor: "rgb(250,122,64, 0.5)",
+        backgroundColor: backgroundColorOutOfOrder,
       },
     ],
   };
   return loss_data;
 };
-export const rate_options = {
-  responsive: true,
-  aspectRatio: 6,
-  scales: {
-    y: {
+export const get_rate_options = (theme: string) => {
+  const color = theme === "dark" ? "rgb(200, 200, 200)" : undefined;
+
+  return {
+    responsive: true,
+    aspectRatio: 6,
+    scales: {
+      y: {
+        title: {
+          display: true,
+          text: "Gbit/s",
+          color: color,
+        },
+        ticks: {
+          color: color,
+        },
+        suggestedMin: 0,
+        beginAtZero: true,
+        grid: {
+          color: color,
+        },
+      },
+      x: {
+        title: {
+          display: true,
+          text: "Time",
+          color: color,
+        },
+        ticks: {
+          source: "auto",
+          autoSkip: true,
+          color: color,
+        },
+        grid: {
+          color: color,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        position: "top" as const,
+        labels: {
+          color: color,
+        },
+      },
       title: {
-        display: true,
-        text: "Gbit/s",
-      },
-      suggestedMin: 0,
-      beginAtZero: true,
-    },
-    x: {
-      title: {
-        display: true,
-        text: "Time",
-      },
-      ticks: {
-        source: "auto",
-        autoSkip: true,
+        display: false,
+        text: "",
       },
     },
-  },
-  plugins: {
-    legend: {
-      position: "top" as const,
-    },
-    title: {
-      display: false,
-      text: "",
-    },
-  },
+  };
 };
 export const get_rate_data = (
   data: TimeStatistics,
-  port_mapping: { [name: number]: number }
+  port_mapping: { [name: number]: number },
+  theme = "light"
 ) => {
   const [labels_tx, line_data_tx] = generateLineData(
     "tx_rate_l1",
@@ -298,6 +365,11 @@ export const get_rate_data = (
     port_mapping
   );
 
+  const backgroundColorTX =
+    theme === "dark" ? "rgba(53, 162, 235, 0.25)" : "rgba(53, 162, 235, 0.5)";
+  const backgroundColorRX =
+    theme === "dark" ? "rgba(250,122,64, 0.25)" : "rgba(250,122,64, 0.5)";
+
   const rate_data = {
     labels: labels_tx,
     datasets: [
@@ -306,33 +378,41 @@ export const get_rate_data = (
         label: "TX rate",
         data: line_data_tx.map((val) => val * 10 ** -9),
         borderColor: "rgb(53, 162, 235)",
-        backgroundColor: "rgba(53, 162, 235, 0.5)",
+        backgroundColor: backgroundColorTX,
       },
       {
         fill: true,
         label: "RX rate",
         data: line_data_rx.map((val) => val * 10 ** -9),
         borderColor: "rgb(183,85,40)",
-        backgroundColor: "rgb(250,122,64, 0.5)",
+        backgroundColor: backgroundColorRX,
       },
     ],
   };
 
   return rate_data;
 };
-export const frame_options = {
-  responsive: true,
-  animation: false,
-  aspectRatio: 2,
-  plugins: {
-    legend: {
-      position: "top" as const,
+export const get_frame_options = (theme: string) => {
+  const color = theme === "dark" ? "rgb(200, 200, 200)" : undefined;
+
+  return {
+    responsive: true,
+    animation: false,
+    aspectRatio: 2,
+    plugins: {
+      legend: {
+        position: "top" as const,
+        labels: {
+          color: color,
+        },
+      },
+      title: {
+        display: false,
+        text: "Frame type",
+        color: color,
+      },
     },
-    title: {
-      display: false,
-      text: "Frame type",
-    },
-  },
+  };
 };
 let frame_type_label = ["Multicast", "Broadcast", "Unicast", "VxLAN"];
 export const get_frame_type_data = (

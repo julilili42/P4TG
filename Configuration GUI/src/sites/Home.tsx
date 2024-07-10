@@ -27,7 +27,7 @@ import {
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
 import translate from "../components/translation/Translate";
-import HiddenGraphs from "../components/pdf/HiddenVisuals2";
+import HiddenGraphs from "../components/pdf/HiddenVisuals";
 import Download from "../components/Download";
 
 import {
@@ -109,9 +109,15 @@ const Home = () => {
   >([]);
 
   const loadPorts = async () => {
-    let stats = await get({ route: "/ports" });
+    let stats;
+    try {
+      stats = await get({ route: "/ports" });
+    } catch (error) {
+      console.error("Error fetching ports:", error);
+      return;
+    }
 
-    if (stats.status === 200) {
+    if (stats && stats.status === 200) {
       set_ports(stats.data);
       if (Object.keys(traffic_gen_list).length === 0) {
         const defaultData = DefaultTrafficGenData(stats.data);
@@ -259,16 +265,22 @@ const Home = () => {
   };
 
   const loadTestInfo = async () => {
-    let stats = await get({ route: "/statistics" });
-    let tg = await get({ route: "/trafficgen" });
+    let stats, tg;
+    try {
+      stats = await get({ route: "/statistics" });
+      tg = await get({ route: "/trafficgen" });
+    } catch (error) {
+      console.error("Error fetching test info:", error);
+      return;
+    }
 
-    if (tg != undefined && tg.status === 200) {
+    if (tg && tg.status === 200) {
       const allTests = tg.data.all_test ?? {};
       const newTotalTestsNumber =
         Object.keys(allTests).length > 0 ? Object.keys(allTests).length : 1;
       setTotalTestsNumber(newTotalTestsNumber);
 
-      if (stats != undefined && stats.status === 200) {
+      if (stats && stats.status === 200) {
         const previousStats = stats.data.previous_statistics ?? {};
         const testNumbersArray = Object.keys(previousStats).map(Number);
 
@@ -289,25 +301,43 @@ const Home = () => {
   };
 
   const loadStatistics = async () => {
-    let stats = await get({ route: "/statistics" });
+    let stats;
+    try {
+      stats = await get({ route: "/statistics" });
+    } catch (error) {
+      console.error("Error fetching statistics:", error);
+      return;
+    }
 
-    if (stats != undefined && stats.status === 200) {
+    if (stats && stats.status === 200) {
       set_statistics(stats.data);
     }
   };
 
   const loadTimeStatistics = async () => {
-    let stats = await get({ route: "/time_statistics?limit=100" });
+    let stats;
+    try {
+      stats = await get({ route: "/time_statistics?limit=100" });
+    } catch (error) {
+      console.error("Error fetching time statistics:", error);
+      return;
+    }
 
-    if (stats != undefined && stats.status === 200) {
+    if (stats && stats.status === 200) {
       set_time_statistics(stats.data);
     }
   };
 
   const loadGen = async () => {
-    let stats = await get({ route: "/trafficgen" });
+    let stats;
+    try {
+      stats = await get({ route: "/trafficgen" });
+    } catch (error) {
+      console.error("Error fetching traffic gen data:", error);
+      return;
+    }
 
-    if (stats != undefined && Object.keys(stats.data).length > 1) {
+    if (stats && Object.keys(stats.data).length > 1) {
       const allTests = stats.data.all_test ?? {
         1: {
           streams: stats.data.streams,

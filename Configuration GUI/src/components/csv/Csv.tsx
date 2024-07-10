@@ -6,17 +6,23 @@ import {
   get_out_of_order_packets,
   get_rtt,
 } from "../../common/utils/StatisticUtils";
-import { Statistics, TimeStatistics } from "../../common/Interfaces";
+import {
+  Statistics,
+  TimeStatistics,
+  TrafficGenList,
+} from "../../common/Interfaces";
 import { generateLineData } from "../../common/utils/VisualUtils";
 import { get_csv_data } from "../../common/utils/CsvUtils";
 
 const DownloadCsv = ({
   data,
   stats,
+  traffic_gen_list,
   port_mapping,
 }: {
   data: TimeStatistics;
   stats: Statistics;
+  traffic_gen_list: TrafficGenList;
   port_mapping: { [name: number]: number };
 }) => {
   const [rtt, set_rtt] = useState({

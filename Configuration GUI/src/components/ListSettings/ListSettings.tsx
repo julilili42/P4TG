@@ -62,9 +62,18 @@ const ListSettings = () => {
   const ref = useRef();
 
   const handleTestModeChange = (event: any) => {
-    const value = Number(event.target.value);
-    localStorage.setItem("test-mode", String(value));
-    setCurrentTestMode(value);
+    const newValue = Number(event.target.value);
+    if (
+      currentTestMode === TestMode.PROFILE &&
+      (newValue === TestMode.SINGLE || newValue === TestMode.MULTI)
+    ) {
+      localStorage.removeItem("traffic_gen");
+      set_traffic_gen_list({});
+      setTabs([]);
+      setTotalDuration(0);
+    }
+    localStorage.setItem("test-mode", String(newValue));
+    setCurrentTestMode(newValue);
   };
 
   const [currentLanguage, setCurrentLanguage] = useState(

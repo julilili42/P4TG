@@ -36,16 +36,16 @@ import { useEffect, useState } from "react";
 import { Col, Form, Row } from "react-bootstrap";
 
 import {
-  loss_options,
-  rate_options,
-  rtt_options,
-  frame_options,
   get_rate_data,
   get_loss_data,
   get_rtt_data,
   get_frame_type_data,
   get_ethernet_type_data,
   get_frame_size_data,
+  get_rate_options,
+  get_loss_options,
+  get_rtt_options,
+  get_frame_options,
 } from "../common/utils/VisualUtils";
 
 import translate from "./translation/Translate";
@@ -75,29 +75,44 @@ const Visuals = ({
     localStorage.getItem("language") || "en-US"
   );
 
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
+
   useEffect(() => {
     const interval = setInterval(() => {
       const storedLanguage = localStorage.getItem("language") || "en-US";
       if (storedLanguage != currentLanguage) {
         setCurrentLanguage(storedLanguage);
       }
+
+      const storedTheme = localStorage.getItem("theme") || "light";
+      if (storedTheme !== theme) {
+        setTheme(storedTheme);
+      }
     }, 100);
     return () => clearInterval(interval);
-  }, [currentLanguage]);
+  }, [currentLanguage, theme]);
 
   const [visual_select, set_visual_select] = useState("rate");
 
-  const rate_data = get_rate_data(data, port_mapping);
+  const rate_data = get_rate_data(data, port_mapping, theme);
 
-  const loss_data = get_loss_data(data, port_mapping);
+  const rate_options = get_rate_options(theme);
+
+  const loss_data = get_loss_data(data, port_mapping, theme);
+
+  const loss_options = get_loss_options(theme);
 
   const rtt_data = get_rtt_data(data, port_mapping);
+
+  const rtt_options = get_rtt_options(theme);
 
   const frame_type_data = get_frame_type_data(stats, port_mapping);
 
   const ethernet_type_data = get_ethernet_type_data(stats, port_mapping);
 
   const frame_size_data = get_frame_size_data(stats, port_mapping);
+
+  const frame_options = get_frame_options(theme);
 
   // @ts-ignore
   return (

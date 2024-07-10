@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import autoTable from "jspdf-autotable";
 import { jsPDF } from "jspdf";
 import { get } from "../../common/API";
 import {
   Statistics,
-  Stream,
-  GenerationMode,
-  StreamSettings,
+  TrafficGenData,
   TrafficGenList,
 } from "../../common/Interfaces";
 import {
@@ -31,68 +29,30 @@ import {
   frameTypes,
   frameSizes,
   modes,
-  splitArrayIntoChunks,
   formatActiveStreamRows,
   formatPortStreamCols,
   formatPortStreamRows,
   frameSizeCountRow,
-  createTableOfContents,
   createTestExplanation,
   addHeadersAndFooters,
   addSubHeaders,
   getPortAndChannelFromPid,
+  addDots,
 } from "../../common/utils/PdfUtils";
 import translate from "../translation/Translate";
+import { PDFDocument } from "pdf-lib";
 
 const DownloadPdf = ({
   stats,
   traffic_gen_list,
-  port_mapping,
-  mode,
-  streams,
-  stream_settings,
   graph_images,
 }: {
   stats: Statistics;
   traffic_gen_list: TrafficGenList;
-  port_mapping: { [name: number]: number };
-  mode: number;
-  streams: Stream[];
-  stream_settings: StreamSettings[];
-  graph_images: string[];
+  graph_images: {
+    [key: number]: { Summary: string[]; [key: string]: string[] };
+  };
 }) => {
-  /* 
-  Ich bekomme hier stats, was das gesamte Statistics Objekt ist und den TestModus. 
-  Entsprechend muss ich diese Komponente anpassen, damit es für den 
-  - Testmode Single: statistics
-  - Testmode Multi: statistics.previous_statistics
-  benutzt. 
-  Ich verwende hier port_mapping, mode, streams, stream_settings etc.. 
-  Ich sollte je nach Test mode diese Werte entsprechend setzen.
-
-
-  Ich könnte einen Parameter i in `handleDownloadPdf` benutzen der dann auf den Test zugreift, den ich anzeigen möchte.
-  Damit könnte ich dann alle Tests in einer for-Schleife durchgehen und die PDFs erstellen.
-
-
-
-  
-  */
-  const [rtt, set_rtt] = useState({
-    mean: 0,
-    max: 0,
-    min: 0,
-    jitter: 0,
-    n: 0,
-    current: 0,
-  });
-  const [iat_tx, set_iat_tx] = useState({ mean: 0, std: 0, n: 0, mae: 0 });
-  const [iat_rx, set_iat_rx] = useState({ mean: 0, std: 0, n: 0, mae: 0 });
-  const [total_tx, set_total_tx] = useState(0);
-  const [total_rx, set_total_rx] = useState(0);
-  const [lost_packets, set_lost_packets] = useState(0);
-  const [out_of_order_packets, set_out_of_order_packets] = useState(0);
-  const [elapsed_time, set_elapsed_time] = useState(0);
   const [ports, set_ports] = useState<
     {
       pid: number;
@@ -111,39 +71,9 @@ const DownloadPdf = ({
     }
   };
 
-  const setValues = (mapping: { [name: number]: number }) => {
-    let ret_tx = 0;
-    let ret_rx = 0;
-
-    Object.keys(stats.frame_size).forEach((v) => {
-      if (Object.keys(mapping).includes(v)) {
-        stats.frame_size[v]["tx"].forEach((f) => {
-          ret_tx += f.packets;
-        });
-      }
-
-      if (Object.values(mapping).map(Number).includes(parseInt(v))) {
-        stats.frame_size[v]["rx"].forEach((f) => {
-          ret_rx += f.packets;
-        });
-      }
-    });
-    loadPorts();
-    set_total_tx(ret_tx);
-    set_total_rx(ret_rx);
-    set_rtt(calculateWeightedRTTs(stats, mapping));
-    set_iat_tx(calculateWeightedIATs("tx", stats, mapping));
-    set_iat_rx(calculateWeightedIATs("rx", stats, mapping));
-    set_lost_packets(get_lost_packets(stats, mapping));
-    set_out_of_order_packets(get_out_of_order_packets(stats, mapping));
-    if (stats.elapsed_time > 0) {
-      set_elapsed_time(stats.elapsed_time);
-    }
-  };
-
   useEffect(() => {
-    setValues(port_mapping);
-  }, [stats, port_mapping]);
+    loadPorts();
+  });
 
   const [currentLanguage, setCurrentLanguage] = useState(
     localStorage.getItem("language") || "en-US"
@@ -159,43 +89,117 @@ const DownloadPdf = ({
     return () => clearInterval(interval);
   }, [currentLanguage]);
 
-  const handleDownloadPdf = () => {
+  const calculateStatistics = (
+    current_statistics: Statistics,
+    port_tx_rx_mapping: { [name: number]: number },
+    current_test?: TrafficGenData
+  ) => {
+    let total_tx = 0;
+    let total_rx = 0;
+
+    Object.keys(current_statistics.frame_size).forEach((v) => {
+      if (Object.keys(port_tx_rx_mapping).includes(v)) {
+        current_statistics.frame_size[v]["tx"].forEach((f: any) => {
+          total_tx += f.packets;
+        });
+      }
+
+      if (Object.values(port_tx_rx_mapping).map(Number).includes(parseInt(v))) {
+        current_statistics.frame_size[v]["rx"].forEach((f: any) => {
+          total_rx += f.packets;
+        });
+      }
+    });
+
+    const rtt = calculateWeightedRTTs(current_statistics, port_tx_rx_mapping);
+    const iat_tx = calculateWeightedIATs(
+      "tx",
+      current_statistics,
+      port_tx_rx_mapping
+    );
+    const iat_rx = calculateWeightedIATs(
+      "rx",
+      current_statistics,
+      port_tx_rx_mapping
+    );
+    const lost_packets = get_lost_packets(
+      current_statistics,
+      port_tx_rx_mapping
+    );
+    const out_of_order_packets = get_out_of_order_packets(
+      current_statistics,
+      port_tx_rx_mapping
+    );
+    const elapsed_time =
+      current_test?.duration || current_statistics.elapsed_time;
+
+    return {
+      total_tx,
+      total_rx,
+      rtt,
+      iat_tx,
+      iat_rx,
+      lost_packets,
+      out_of_order_packets,
+      elapsed_time,
+    };
+  };
+
+  const subHeadersMap: any = useRef({});
+
+  const createPdf = (
+    testList: TrafficGenList,
+    stats: Statistics,
+    graph_images: { Summary: string[]; [key: string]: string[] },
+    testNumber: number
+  ) => {
+    const current_test = testList[testNumber];
+
+    const test_name = current_test.name || `Test ${testNumber}`;
+
+    const { mode, stream_settings, streams, port_tx_rx_mapping } = current_test;
+
+    const current_statistics = stats.previous_statistics?.[testNumber] || stats;
+
+    const {
+      total_tx,
+      total_rx,
+      rtt,
+      iat_tx,
+      iat_rx,
+      lost_packets,
+      out_of_order_packets,
+      elapsed_time,
+    } = calculateStatistics(
+      current_statistics,
+      port_tx_rx_mapping,
+      current_test
+    );
+
     const doc = new jsPDF("p", "mm", [297, 210]);
     doc.setFont("helvetica", "normal");
 
-    // Split the graph images array into subarrays of size 6 (number of graphs per port pair), starting with each port pair and ending with the summary graphs
-    const all_network_graphs = splitArrayIntoChunks(graph_images, 6);
-
-    // Create Array which holds all chapters
-    const subHeaders = activePorts(port_mapping).flatMap((v) => [
-      [
-        `${translate("Overview", currentLanguage)} ${v.tx} (${
-          getPortAndChannelFromPid(v.tx, ports).port
-        }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`,
-      ],
-      [
-        `${translate("Network Graphs", currentLanguage)} ${v.tx} (${
-          getPortAndChannelFromPid(v.tx, ports).port
-        }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`,
-      ],
-    ]);
-
-    subHeaders.unshift([
-      `${translate("Network Graphs Summary", currentLanguage)}`,
-    ]);
-    subHeaders.unshift([`${translate("Summary", currentLanguage)}`]);
-    subHeaders.unshift([
+    const subHeaders: string[] = [
+      `${translate("Test explanation", currentLanguage)}`,
       `${translate("Stream Configuration in", currentLanguage)} ${
         modes[mode as any]
       } ${translate("mode", currentLanguage)}`,
-    ]);
-    subHeaders.unshift([`${translate("Test explanation", currentLanguage)}`]);
-    subHeaders.unshift([`${translate("Table of Contents", currentLanguage)}`]);
+      `${translate("Summary", currentLanguage)}`,
+      `${translate("Network Graphs Summary", currentLanguage)}`,
+    ];
 
-    /* Table of Contents */
-    createTableOfContents(doc, subHeaders, currentLanguage);
+    activePorts(port_tx_rx_mapping).forEach((v) => {
+      subHeaders.push(
+        `${translate("Overview", currentLanguage)} ${v.tx} (${
+          getPortAndChannelFromPid(v.tx, ports).port
+        }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`,
+        `${translate("Network Graphs", currentLanguage)} ${v.tx} (${
+          getPortAndChannelFromPid(v.tx, ports).port
+        }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`
+      );
+    });
 
-    doc.addPage();
+    subHeadersMap.current[testNumber] = subHeaders;
 
     /* Test explanation */
     createTestExplanation(doc, dummyText);
@@ -206,7 +210,7 @@ const DownloadPdf = ({
 
     // Active Ports Table
 
-    const activePortsRows = formatActivePortsRows(port_mapping, ports);
+    const activePortsRows = formatActivePortsRows(port_tx_rx_mapping, ports);
 
     autoTable(
       doc,
@@ -263,7 +267,7 @@ const DownloadPdf = ({
     const portStreamCols = formatPortStreamCols(streams);
 
     const portStreamRows = formatPortStreamRows(
-      port_mapping,
+      port_tx_rx_mapping,
       ports,
       stream_settings,
       streams,
@@ -326,8 +330,8 @@ const DownloadPdf = ({
 
     const frameEthernetRows = frameTypes.map((type) =>
       frameEthernetRow(
-        stats,
-        port_mapping,
+        current_statistics,
+        port_tx_rx_mapping,
         type.label1 as string,
         type.label2 as string,
         total_tx,
@@ -359,8 +363,8 @@ const DownloadPdf = ({
       ...frameSizes.map(([label, low, high]) =>
         label != "Total"
           ? frameSizeCountRow(
-              stats,
-              port_mapping,
+              current_statistics,
+              port_tx_rx_mapping,
               label as string,
               low as number,
               high as number,
@@ -401,61 +405,35 @@ const DownloadPdf = ({
 
     /* Network Graphs Summary */
 
-    // Last element of all_network_graphs is the summary graphs
-    all_network_graphs[all_network_graphs.length - 1].forEach(
-      (imageData, index) => {
-        doc.addImage(
-          imageData,
-          "JPEG",
-          15,
-          35 + 40 * index,
-          180,
-          36,
-          "",
-          "FAST"
-        );
-      }
-    );
+    graph_images.Summary.forEach((imageData, index) => {
+      doc.addImage(imageData, "JPEG", 15, 35 + 40 * index, 180, 36, "", "FAST");
+    });
+
     doc.addPage();
 
     /* Active ports report */
 
-    activePorts(port_mapping).map((v, i, array) => {
+    activePorts(port_tx_rx_mapping).map((v, i, array) => {
       let mapping: { [name: number]: number } = { [v.tx]: v.rx };
 
-      let ret_tx = 0;
-      let ret_rx = 0;
-
-      Object.keys(stats.frame_size).forEach((v) => {
-        if (Object.keys(mapping).includes(v)) {
-          stats.frame_size[v]["tx"].forEach((f) => {
-            ret_tx += f.packets;
-          });
-        }
-
-        if (Object.values(mapping).map(Number).includes(parseInt(v))) {
-          stats.frame_size[v]["rx"].forEach((f) => {
-            ret_rx += f.packets;
-          });
-        }
-      });
-
-      const lost_packets = get_lost_packets(stats, mapping);
-      const total_rx = ret_rx;
-      const total_tx = ret_tx;
-      const out_of_order_packets = get_out_of_order_packets(stats, mapping);
-      const iats_tx = calculateWeightedIATs("tx", stats, mapping);
-      const iats_rx = calculateWeightedIATs("rx", stats, mapping);
-      const rtt = calculateWeightedRTTs(stats, mapping);
+      const {
+        total_tx,
+        total_rx,
+        rtt,
+        iat_tx,
+        iat_rx,
+        lost_packets,
+        out_of_order_packets,
+      } = calculateStatistics(current_statistics, mapping);
 
       const frameStatsRTTRows = formatFrameStatsRTTRows({
-        lost_packets: lost_packets,
-        total_rx: total_rx,
-        out_of_order_packets: out_of_order_packets,
-        iat_tx: iats_tx,
-        iat_rx: iats_rx,
-        rtt: rtt,
-        currentLanguage: currentLanguage,
+        lost_packets,
+        total_rx,
+        out_of_order_packets,
+        iat_tx,
+        iat_rx,
+        rtt,
+        currentLanguage,
       });
 
       autoTable(
@@ -480,7 +458,7 @@ const DownloadPdf = ({
 
       const frameEthernetRows = frameTypes.map((type) =>
         frameEthernetRow(
-          stats,
+          current_statistics,
           mapping,
           type.label1 as string,
           type.label2 as string,
@@ -511,7 +489,7 @@ const DownloadPdf = ({
         ...frameSizes.map(([label, low, high]) =>
           label != "Total"
             ? frameSizeCountRow(
-                stats,
+                current_statistics,
                 mapping,
                 label as string,
                 low as number,
@@ -551,7 +529,7 @@ const DownloadPdf = ({
 
       doc.addPage();
 
-      all_network_graphs[i].forEach((imageData, index) => {
+      graph_images[v.tx]?.forEach((imageData, index) => {
         doc.addImage(
           imageData,
           "JPEG",
@@ -560,7 +538,7 @@ const DownloadPdf = ({
           180,
           36,
           "",
-          "FAST" // Image Compression
+          "FAST"
         );
       });
 
@@ -571,10 +549,121 @@ const DownloadPdf = ({
     });
 
     /* Add header and footer to every page */
-    addHeadersAndFooters(doc, elapsed_time, "Test 1", currentLanguage);
-    /*     addSubHeaders(doc, subHeaders);
-     */
-    doc.save("Network Report.pdf");
+    addHeadersAndFooters(doc, elapsed_time, test_name, currentLanguage);
+    addSubHeaders(doc, subHeaders);
+
+    return doc.output("arraybuffer");
+  };
+
+  const createToC = (
+    doc: jsPDF,
+    subHeadersMap: { [key: number]: string[] },
+    testList: TrafficGenList,
+    currentLanguage: string
+  ) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+
+    const startX = 15;
+    const buffer = 2;
+    const targetX = 180 - buffer;
+    let currentPage = 1;
+    let yPosition = 40;
+
+    Object.keys(subHeadersMap).forEach((testNumber) => {
+      const testId = parseInt(testNumber);
+      const testName = testList[testId].name || `Test ${testId}`;
+
+      if (yPosition > 290) {
+        yPosition = 40;
+        doc.addPage();
+      }
+
+      doc.text(testName, startX, yPosition);
+      yPosition += 10;
+
+      const subHeaders = subHeadersMap[testNumber as any];
+      subHeaders.forEach((header, subIndex) => {
+        const title = header;
+        const pageNumberText =
+          translate("Page", currentLanguage) +
+          " " +
+          (currentPage + subIndex + 1).toString();
+
+        doc.text(title, startX, yPosition);
+
+        doc.setFont("helvetica", "bold");
+        doc.text(pageNumberText, targetX + buffer, yPosition);
+        doc.setFont("helvetica", "normal");
+
+        const textWidth = doc.getTextWidth(title);
+        const dots = addDots(doc, title, targetX, startX, buffer);
+        doc.text(dots, startX + textWidth + buffer, yPosition);
+
+        yPosition += 10;
+        if (yPosition > 290) {
+          yPosition = 40;
+          doc.addPage();
+          currentPage += subIndex + 1;
+        }
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFontSize(17);
+      doc.setFont("helvetica", "bold");
+      doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+      doc.setFont("helvetica", "normal");
+
+      doc.setFontSize(12);
+      doc.text("Table of Contents", 105, 25, { align: "center" });
+
+      currentPage += subHeaders.length;
+      yPosition += 10; // Extra space between tests
+    });
+
+    return doc;
+  };
+
+  const mergePdfs = async (pdfsToMerge: ArrayBuffer[]) => {
+    const mergedPdf = await PDFDocument.create();
+
+    for (const pdfBuffer of pdfsToMerge) {
+      const pdf = await PDFDocument.load(pdfBuffer);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach((page) => {
+        mergedPdf.addPage(page);
+      });
+    }
+
+    const mergedPdfFile = await mergedPdf.save();
+    return mergedPdfFile;
+  };
+
+  const handleDownloadPdf = async () => {
+    const pdfBuffers = await Promise.all(
+      Object.keys(traffic_gen_list).map((key) =>
+        createPdf(
+          traffic_gen_list,
+          stats,
+          graph_images[Number(key)],
+          Number(key)
+        )
+      )
+    );
+
+    const tocDoc = new jsPDF("p", "mm", [297, 210]);
+    createToC(tocDoc, subHeadersMap.current, traffic_gen_list, currentLanguage);
+    const tocPdfBuffer = tocDoc.output("arraybuffer");
+
+    const mergedPdfFile = await mergePdfs([tocPdfBuffer, ...pdfBuffers]);
+
+    const blob = new Blob([mergedPdfFile], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "MergedNetworkReport.pdf";
+    a.click();
+    console.log(subHeadersMap.current);
   };
 
   return { handleDownloadPdf };

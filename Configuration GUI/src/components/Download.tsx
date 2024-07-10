@@ -1,6 +1,6 @@
 import { Dropdown } from "react-bootstrap";
 import DownloadCsv from "./csv/Csv";
-import DownloadPdf from "./pdf/Pdf2";
+import DownloadPdf from "./pdf/Pdf";
 
 import { Statistics, TimeStatistics } from "../common/Interfaces";
 import { TrafficGenList, Stream, StreamSettings } from "../common/Interfaces";
