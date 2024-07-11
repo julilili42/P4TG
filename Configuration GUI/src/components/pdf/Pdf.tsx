@@ -37,7 +37,7 @@ import {
   addHeadersAndFooters,
   addSubHeaders,
   getPortAndChannelFromPid,
-  addDots,
+  createToC,
 } from "../../common/utils/PdfUtils";
 import translate from "../translation/Translate";
 import { PDFDocument } from "pdf-lib";
@@ -180,7 +180,6 @@ const DownloadPdf = ({
     doc.setFont("helvetica", "normal");
 
     const subHeaders: string[] = [
-      `${translate("Test explanation", currentLanguage)}`,
       `${translate("Stream Configuration in", currentLanguage)} ${
         modes[mode as any]
       } ${translate("mode", currentLanguage)}`,
@@ -200,11 +199,6 @@ const DownloadPdf = ({
     });
 
     subHeadersMap.current[testNumber] = subHeaders;
-
-    /* Test explanation */
-    createTestExplanation(doc, dummyText);
-
-    doc.addPage();
 
     /* Stream Configuration */
 
@@ -555,75 +549,6 @@ const DownloadPdf = ({
     return doc.output("arraybuffer");
   };
 
-  const createToC = (
-    doc: jsPDF,
-    subHeadersMap: { [key: number]: string[] },
-    testList: TrafficGenList,
-    currentLanguage: string
-  ) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-
-    const startX = 15;
-    const buffer = 2;
-    const targetX = 180 - buffer;
-    let currentPage = 1;
-    let yPosition = 40;
-
-    Object.keys(subHeadersMap).forEach((testNumber) => {
-      const testId = parseInt(testNumber);
-      const testName = testList[testId].name || `Test ${testId}`;
-
-      if (yPosition > 290) {
-        yPosition = 40;
-        doc.addPage();
-      }
-
-      doc.text(testName, startX, yPosition);
-      yPosition += 10;
-
-      const subHeaders = subHeadersMap[testNumber as any];
-      subHeaders.forEach((header, subIndex) => {
-        const title = header;
-        const pageNumberText =
-          translate("Page", currentLanguage) +
-          " " +
-          (currentPage + subIndex + 1).toString();
-
-        doc.text(title, startX, yPosition);
-
-        doc.setFont("helvetica", "bold");
-        doc.text(pageNumberText, targetX + buffer, yPosition);
-        doc.setFont("helvetica", "normal");
-
-        const textWidth = doc.getTextWidth(title);
-        const dots = addDots(doc, title, targetX, startX, buffer);
-        doc.text(dots, startX + textWidth + buffer, yPosition);
-
-        yPosition += 10;
-        if (yPosition > 290) {
-          yPosition = 40;
-          doc.addPage();
-          currentPage += subIndex + 1;
-        }
-      });
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      doc.setFontSize(17);
-      doc.setFont("helvetica", "bold");
-      doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
-      doc.setFont("helvetica", "normal");
-
-      doc.setFontSize(12);
-      doc.text("Table of Contents", 105, 25, { align: "center" });
-
-      currentPage += subHeaders.length;
-      yPosition += 10; // Extra space between tests
-    });
-
-    return doc;
-  };
-
   const mergePdfs = async (pdfsToMerge: ArrayBuffer[]) => {
     const mergedPdf = await PDFDocument.create();
 
@@ -655,7 +580,15 @@ const DownloadPdf = ({
     createToC(tocDoc, subHeadersMap.current, traffic_gen_list, currentLanguage);
     const tocPdfBuffer = tocDoc.output("arraybuffer");
 
-    const mergedPdfFile = await mergePdfs([tocPdfBuffer, ...pdfBuffers]);
+    const expDoc = new jsPDF("p", "mm", [297, 210]);
+    createTestExplanation(expDoc, dummyText);
+    const expPdfBuffer = expDoc.output("arraybuffer");
+
+    const mergedPdfFile = await mergePdfs([
+      tocPdfBuffer,
+      expPdfBuffer,
+      ...pdfBuffers,
+    ]);
 
     const blob = new Blob([mergedPdfFile], { type: "application/pdf" });
     const url = URL.createObjectURL(blob);

@@ -312,6 +312,7 @@ const ListSettings = () => {
         localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
         window.location.reload();
       }
+
       if (!localStorage.getItem("test-mode")) {
         localStorage.setItem("test-mode", String(TestMode.SINGLE));
       }

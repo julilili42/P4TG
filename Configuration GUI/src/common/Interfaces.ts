@@ -291,6 +291,7 @@ export const DefaultTrafficGenData = (
     streams: [DefaultStream(1)],
     stream_settings: initialStreamSettings,
     port_tx_rx_mapping: {},
+    duration: 0,
   };
 };
 

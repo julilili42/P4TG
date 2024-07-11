@@ -183,6 +183,12 @@ table {
     background-color: var(--color-yellow);
     border: 1px solid var(--color-yellow);
   }
+
+  &-secondary {
+    &:disabled {
+      opacity: 1;
+    }
+  }
 }
 
 .nav-item {
@@ -365,6 +371,9 @@ table {
 }
 .theme-icon {
   transition: color 0.5s ease;
+  &:hover {
+    color: var(--color-primary) !important;
+  }
 }
 
 @media only screen and (max-width: 450px) {

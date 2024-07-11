@@ -36,7 +36,8 @@ export const get_csv_data = (
     line_data_out_of_order: any[];
     labels_rtt: string[];
     line_data_rtt: any[];
-  }
+  },
+  testNumber: number
 ) => {
   const {
     iat_tx,
@@ -60,6 +61,9 @@ export const get_csv_data = (
 
   const get_csv_summary_data = () => {
     const csvSummary = [
+      [""],
+      ["Test " + testNumber],
+      [""],
       ["Summary"],
       [""],
       ["IAT", "TX", "RX"],

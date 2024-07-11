@@ -221,18 +221,25 @@ const Home = () => {
         } else {
           if (test_mode === TestMode.SINGLE) {
             const singleTest = traffic_gen_list[1];
-            localStorage.setItem(
+
+            const modifiedSingleTest =
+              singleTest.mode === GenerationMode.ANALYZE
+                ? { ...singleTest, streams: [] }
+                : singleTest;
+
+            // Für was brauch ich das?
+            /* localStorage.setItem(
               "traffic_gen",
-              JSON.stringify({ "1": { ...singleTest, duration: 0 } })
-            );
+              JSON.stringify({ "1": { ...modifiedSingleTest, duration: 0 } })
+            ); */
 
             await post({
               route: "/trafficgen",
               body: {
-                streams: singleTest.streams,
-                stream_settings: singleTest.stream_settings,
-                port_tx_rx_mapping: singleTest.port_tx_rx_mapping,
-                mode: singleTest.mode,
+                streams: modifiedSingleTest.streams,
+                stream_settings: modifiedSingleTest.stream_settings,
+                port_tx_rx_mapping: modifiedSingleTest.port_tx_rx_mapping,
+                mode: modifiedSingleTest.mode,
               },
             });
           } else if (
@@ -547,7 +554,10 @@ const Home = () => {
         className="mt-3"
         onSelect={(eventKey) => handleSelectTest(Number(eventKey))}
       >
-        <Tab eventKey="current" title={`Current`}>
+        <Tab
+          eventKey="current"
+          title={translate("Current Test", currentLanguage)}
+        >
           <Tabs defaultActiveKey="Summary" className="mt-3">
             <Tab
               eventKey="Summary"

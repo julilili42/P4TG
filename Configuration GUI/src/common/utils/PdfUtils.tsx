@@ -8,8 +8,13 @@ import {
   formatTime,
   secondsToTime,
 } from "./StatisticUtils";
-import { Statistics, Stream, StreamSettings } from "../Interfaces";
-import { UserOptions } from "jspdf-autotable";
+import {
+  Statistics,
+  Stream,
+  StreamSettings,
+  TrafficGenList,
+} from "../Interfaces";
+import autoTable, { UserOptions } from "jspdf-autotable";
 import { jsPDF } from "jspdf";
 import translate from "../../components/translation/Translate";
 
@@ -52,59 +57,6 @@ export const addDots = (
   return dots;
 };
 
-export const createTableOfContents = (
-  doc: jsPDF,
-  subHeaders: string[][],
-  currentLanguage: string,
-  startX = 15,
-  buffer = 2
-) => {
-  doc.setFontSize(12);
-  let currentPage = 1;
-
-  // Start position for the page number with buffer accounted
-  const targetX = 180 - buffer;
-
-  for (let i = 0; i < subHeaders.length; i++) {
-    // Skip Table of Contents in Table of Contents
-    if (i > 0) {
-      let yPosition = 40 + (i - 1) * 10;
-      let title = subHeaders[i][0];
-      let pageNumberText =
-        translate("Page", currentLanguage) + " " + (i + 1).toString();
-
-      // Add the chapter title
-      doc.textWithLink(title, startX, yPosition, {
-        pageNumber: currentPage,
-      });
-
-      // Add the page number
-      doc.setFont("helvetica", "bold");
-      doc.textWithLink(pageNumberText, targetX + buffer, yPosition, {
-        pageNumber: currentPage,
-      });
-      doc.setFont("helvetica", "normal");
-
-      // Calculate and add the dots with buffer space
-      let textWidth = doc.getTextWidth(title);
-      let dots = addDots(doc, title, targetX, startX, buffer);
-      doc.text(dots, startX + textWidth + buffer, yPosition);
-    }
-    currentPage++;
-  }
-};
-
-export const createTestExplanation = (
-  doc: jsPDF,
-  text: string,
-  startX = 20,
-  startY = 35,
-  maxWidth = 170
-) => {
-  const splitTextToSize = doc.splitTextToSize(text, maxWidth);
-  doc.text(splitTextToSize, startX, startY);
-};
-
 export const addHeadersAndFooters = (
   doc: jsPDF,
   elapsed_time: number,
@@ -121,16 +73,6 @@ export const addHeadersAndFooters = (
     const pageHeight = doc.internal.pageSize.getHeight();
 
     // Test duration and report generation time
-    doc.text(
-      translate("Report was generated on:", currentLanguage) +
-        " " +
-        formatTime(),
-      5,
-      5,
-      {
-        align: "left",
-      }
-    );
     doc.text(
       translate("Test duration:", currentLanguage) +
         " " +
@@ -186,6 +128,300 @@ export const addSubHeaders = (doc: jsPDF, subHeaders: string[]) => {
 
     currentPage++;
   }
+};
+
+export const createToC = (
+  doc: jsPDF,
+  subHeadersMap: { [key: number]: string[] },
+  testList: TrafficGenList,
+  currentLanguage: string
+) => {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+
+  const startX = 15;
+  const buffer = 2;
+  const targetX = 180 - buffer;
+  let currentPage = 1;
+  let yPosition = 40;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const numberOfRows = Object.values(subHeadersMap).reduce(
+    (sum, array) => sum + array.length,
+    0
+  );
+  const addExtraPage = numberOfRows > 23 ? 1 : 0;
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Test explanation", startX, yPosition);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    translate("Page ", currentLanguage) + String(2 + addExtraPage),
+    targetX + buffer,
+    yPosition
+  );
+  doc.setFont("helvetica", "normal");
+
+  const textWidthTestExplanation = doc.getTextWidth("Test explanation");
+  const dotsTestExplanation = addDots(
+    doc,
+    "Test explanation",
+    targetX,
+    startX,
+    buffer
+  );
+  doc.text(
+    dotsTestExplanation,
+    startX + textWidthTestExplanation + buffer,
+    yPosition
+  );
+
+  yPosition += 10;
+
+  doc.setFont("helvetica", "normal");
+  doc.text("Term explanation", startX, yPosition);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    translate("Page ", currentLanguage) + String(3 + addExtraPage),
+    targetX + buffer,
+    yPosition
+  );
+  doc.setFont("helvetica", "normal");
+  const textWidthTermExplanation = doc.getTextWidth("Term explanation");
+  const dotsTermExplanation = addDots(
+    doc,
+    "Term explanation",
+    targetX,
+    startX,
+    buffer
+  );
+  doc.text(
+    dotsTermExplanation,
+    startX + textWidthTermExplanation + buffer,
+    yPosition
+  );
+
+  yPosition += 10;
+
+  Object.keys(subHeadersMap).forEach((testNumber, index) => {
+    const testId = parseInt(testNumber);
+    const testName = testList[testId].name || `Test ${testId}`;
+
+    if (yPosition > 290) {
+      yPosition = 40;
+      doc.addPage();
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(testName, startX, yPosition);
+    doc.setFont("helvetica", "normal");
+    yPosition += 10;
+
+    const subHeaders = subHeadersMap[testNumber as any];
+    subHeaders.forEach((header, subIndex) => {
+      const title = header;
+      const pageNumberText =
+        translate("Page", currentLanguage) +
+        " " +
+        (currentPage + subIndex + addExtraPage + 3).toString();
+
+      doc.text(title, startX, yPosition);
+
+      doc.setFont("helvetica", "bold");
+      doc.text(pageNumberText, targetX + buffer, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      const textWidth = doc.getTextWidth(title);
+      const dots = addDots(doc, title, targetX, startX, buffer);
+      doc.text(dots, startX + textWidth + buffer, yPosition);
+
+      yPosition += 10;
+      if (yPosition > 290) {
+        yPosition = 40;
+        doc.addPage();
+        currentPage += subIndex + 1;
+      }
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.setFontSize(17);
+    doc.setFont("helvetica", "bold");
+    doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+    doc.setFont("helvetica", "normal");
+
+    doc.setFontSize(12);
+    doc.text("Table of Contents", 105, 25, { align: "center" });
+
+    currentPage += subHeaders.length;
+
+    doc.setFontSize(8);
+    doc.text(
+      translate("Report was generated on:", currentLanguage) +
+        " " +
+        formatTime(),
+      5,
+      5,
+      {
+        align: "left",
+      }
+    );
+    doc.setFontSize(12);
+  });
+
+  doc.setFontSize(8);
+
+  doc.textWithLink("P4TG@Github", pageWidth / 2, pageHeight - 5, {
+    url: "https://github.com/uni-tue-kn/P4TG",
+    align: "center",
+  });
+
+  return doc;
+};
+
+const glossary = [
+  [
+    "CBR (Constant Bit Rate)",
+    "A transmission mode where the data rate remains constant regardless of the amount of data being transmitted.",
+  ],
+  [
+    "Poisson Mode",
+    "A traffic generation mode where packets are sent according to a Poisson distribution, which is used to model random traffic arrivals.",
+  ],
+  [
+    "Monitor Mode",
+    "A mode in which the network traffic is monitored without injecting any additional traffic, used for passive analysis.",
+  ],
+  [
+    "P4TG (P4-based 1 Tb/s traffic generator)",
+    "A traffic generator based on the P4 programming model capable of generating data at a rate of 1 Terabit per second.",
+  ],
+  [
+    "Packet Loss",
+    "The failure of one or more transmitted packets to arrive at their destination, indicating network inefficiency.",
+  ],
+  [
+    "RTT (Round-Trip Time)",
+    "The time it takes for a signal to travel from the source to the destination and back again, used to measure network latency.",
+  ],
+  [
+    "IAT (Inter-Arrival Time)",
+    "The time interval between the arrivals of consecutive packets, used to assess the consistency of packet delivery.",
+  ],
+  [
+    "Jitter",
+    "The variation in packet arrival times, which can impact the quality of real-time communications like voice and video.",
+  ],
+  [
+    "TX (Transmit)",
+    "Refers to the transmission of data packets from a source port.",
+  ],
+  [
+    "RX (Receive)",
+    "Refers to the reception of data packets at a destination port.",
+  ],
+  [
+    "VxLan (Virtual Extensible LAN)",
+    "A network virtualization technology that improves scalability by encapsulating Ethernet frames within UDP packets.",
+  ],
+  ["Frame Size", "The size of a data packet or frame measured in bytes."],
+  [
+    "Frame Loss Ratio",
+    "The ratio of lost frames to the total transmitted frames, indicating the efficiency of data transmission.",
+  ],
+  [
+    "MAE (Mean Absolute Error)",
+    "A measure of the average absolute difference between the transmitted and received inter-arrival times, indicating timing precision.",
+  ],
+  [
+    "Multicast",
+    "The transmission of data to multiple recipients simultaneously within a network.",
+  ],
+  [
+    "Unicast",
+    "The transmission of data to a single specific recipient within a network.",
+  ],
+  [
+    "VLAN (Virtual Local Area Network)",
+    "A network configuration that allows multiple distinct networks to coexist on a single physical network infrastructure.",
+  ],
+  [
+    "QinQ (802.1ad)",
+    "A network protocol that allows for multiple VLANs to be nested within each other, providing increased scalability.",
+  ],
+  [
+    "MPLS (Multiprotocol Label Switching)",
+    "A technique for directing data packets through a network based on short path labels rather than long network addresses.",
+  ],
+  [
+    "IAT Precision",
+    "A mode where the traffic generator aims to maintain precise inter-arrival times between packets.",
+  ],
+  [
+    "Rate Precision",
+    "A mode where the traffic generator aims to maintain a precise data rate for packet transmission.",
+  ],
+];
+
+export const createTestExplanation = (
+  doc: jsPDF,
+  text: string,
+  startX = 20,
+  startY = 35,
+  maxWidth = 170
+) => {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  const splitTextToSize = doc.splitTextToSize(text, maxWidth);
+  doc.text(splitTextToSize, startX, startY);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFontSize(17);
+  doc.setFont("helvetica", "bold");
+  doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+  doc.setFont("helvetica", "normal");
+
+  doc.setFontSize(12);
+  doc.text("Test explanation", 105, 25, { align: "center" });
+
+  doc.setFontSize(8);
+
+  doc.textWithLink("P4TG@Github", pageWidth / 2, pageHeight - 5, {
+    url: "https://github.com/uni-tue-kn/P4TG",
+    align: "center",
+  });
+
+  doc.addPage();
+
+  doc.setFontSize(17);
+  doc.setFont("helvetica", "bold");
+  doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+  doc.setFont("helvetica", "normal");
+
+  doc.setFontSize(12);
+  doc.text("Term explanation", 105, 25, { align: "center" });
+
+  autoTable(doc, {
+    startY: startY,
+    head: [["Term", "Explanation"]],
+    body: glossary,
+    theme: "plain",
+    styles: { fontSize: 10 },
+    margin: { left: startX },
+    columnStyles: {
+      0: { cellWidth: 60 },
+      1: { cellWidth: 110 },
+    },
+  });
+
+  doc.setFontSize(8);
+
+  doc.textWithLink("P4TG@Github", pageWidth / 2, pageHeight - 5, {
+    url: "https://github.com/uni-tue-kn/P4TG",
+    align: "center",
+  });
 };
 
 export const shouldDrawLine = (
@@ -456,9 +692,8 @@ export const frameSizeCountRow = (
     relative_rx,
   ];
 };
-
 export const dummyText =
-  "Lorem, ipsum dolor sit amet consectetur adipisicing elit. Laborum id ducimus dignissimos. Nam minus pariatur vel. Nesciunt, tenetur placeat temporibus aspernatur, asperiores eum voluptates facere cumque corporis sequi amet, necessitatibus minus voluptas autem. Necessitatibus recusandae et repellat, assumenda sunt maxime incidunt voluptatum? Ullam numquam eos animi atque culpa? Commodi rerum maiores, obcaecati vitae autem officiis consectetur vel beatae nemo suscipit repudiandae non cupiditate neque nulla animi voluptatem amet sapiente. Inventore consequuntur iure repudiandae est ex eos neque nihil quae! Harum nemo nostrum veniam enim obcaecati, quidem aliquam unde corporis eos commodi illum nisi sed laudantium consectetur maiores magnam odit quos blanditiis minus. Corrupti, explicabo labore? Laudantium recusandae eos magnam cum quidem a repellendus ea laboriosam aliquam fugiat numquam, distinctio deserunt inventore eius facilis quaerat illo? Harum rem nulla ipsam aspernatur architecto consequatur eum quo dolor soluta recusandae. Minus nulla in iure quia amet perferendis disati rem quaerat odit fugiat ipsam facilis doloribus perspiciatis quae voluptates dolorum earum perferendis natus magnam et modi enim sequi exercitationem. Minima laudantium doloremque repellat commodi pariatur molestiae?";
+  "This report provides a comprehensive overview of the network performance tests conducted using the P4-based 1 Tb/s traffic generator (P4TG). The P4TG is utilized to generate high-speed network traffic, enabling the evaluation of various network parameters under controlled conditions. These tests are designed to measure the network's ability to handle high-speed data transfer, ensuring both efficiency and reliability. Key metrics such as packet loss, round-trip time (RTT), inter-arrival times (IAT), and jitter were recorded to provide insights into the network's performance. The following sections summarize the recorded statistics in the form of data and corresponding graphs, highlighting the network's strengths and identifying potential areas for improvement.";
 
 export const modes: { [key: number]: string } = {
   0: "Generation Mode",
@@ -539,20 +774,4 @@ export const formatFrameStatsRTTRows = (data: any) => {
   ];
 
   return rows;
-};
-
-export const splitArrayIntoChunks = <T,>(
-  array: T[],
-  chunkSize: number
-): T[][] => {
-  if (array.length % chunkSize !== 0) {
-    throw new Error(`Array length must be divisible by ${chunkSize}`);
-  }
-
-  const result: T[][] = [];
-  for (let i = 0; i < array.length; i += chunkSize) {
-    result.push(array.slice(i, i + chunkSize));
-  }
-
-  return result;
 };

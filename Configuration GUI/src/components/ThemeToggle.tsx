@@ -5,8 +5,11 @@ const ThemeBtn = () => {
   const [theme, setTheme] = useState(() => {
     let storedTheme = localStorage.getItem("theme");
     if (!storedTheme) {
-      localStorage.setItem("theme", "light");
-      storedTheme = "light";
+      const prefersDarkScheme = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      storedTheme = prefersDarkScheme ? "dark" : "light";
+      localStorage.setItem("theme", storedTheme);
     }
     return storedTheme;
   });
