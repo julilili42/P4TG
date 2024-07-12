@@ -256,3 +256,15 @@ pub struct EmptyResponse {
 pub struct Reset {
     pub(crate) message: String
 }
+
+// Stores test results of RFC2544 test 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct TestResult {
+    pub(crate) throughput: Option<f32>,
+    pub(crate) latency: Option<f64>,
+    pub(crate) frame_loss_rate: Option<f32>,
+    pub(crate) back_to_back: Option<f64>,
+    pub(crate) running: bool, 
+}
+
+

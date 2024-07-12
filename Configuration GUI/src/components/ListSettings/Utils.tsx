@@ -1,8 +1,9 @@
-import { Button, Col, Form, Row } from "react-bootstrap";
+import { Button, Col, Form, Row, Table } from "react-bootstrap";
 import {
   GenerationMode,
   TestMode,
   TrafficGenData,
+  RFCTestResults,
 } from "../../common/Interfaces";
 import translate from "../translation/Translate";
 import InfoBox from "../InfoBox";
@@ -163,6 +164,43 @@ const GenerationModeSelection = ({
   );
 };
 
+const ResultTable = ({ results }: { results: RFCTestResults }) => {
+  return (
+    <>
+      <Row>
+        <Col>
+          <Table
+            striped
+            bordered
+            hover
+            size="sm"
+            className={"mt-3 mb-3 text-center"}
+          >
+            <thead className={"table-dark"}>
+              <tr>
+                <th>Test-Result</th>
+                <th>Throughput</th>
+                <th>Latency</th>
+                <th>Frame-Loss</th>
+                <th>Back-To-Back Packets</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Value</td>
+                <td>{results.throughput ?? "Not finished"}</td>
+                <td>{results.latency ?? "Not finished"}</td>
+                <td>{results.frame_loss_rate ?? "Not finished"}</td>
+                <td>{results.back_to_back ?? "Not finished"}</td>
+              </tr>
+            </tbody>
+          </Table>
+        </Col>
+      </Row>
+    </>
+  );
+};
+
 export {
   SaveResetButtons,
   AddStreamButton,
@@ -170,4 +208,5 @@ export {
   GenerationModeSelection,
   TotalDuration,
   ImportExport,
+  ResultTable,
 };

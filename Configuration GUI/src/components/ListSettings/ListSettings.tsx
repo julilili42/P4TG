@@ -27,13 +27,20 @@ import {
   validateStreamSettings,
   validateStreams,
 } from "../../common/Validators";
-import Profiles from "./Profile";
+import Profile from "./Profile";
+import Profile2 from "./Profile2";
 
 interface Tab {
   eventKey: string;
   title: string;
   titleEditable: boolean;
 }
+
+/* 
+Ich sollte Settings.tsx löschen
+Ich sollte außerdem überlegen welche Funktionen ich in eine ListSettingsUtils Datei auslagern kann (vereinen mit den bereits ausgelagerten Teilen von Utils.tsx)
+Ich sollte ListSettings umbennen zu Settings und sie entsprechend verschieben
+*/
 
 const ListSettings = () => {
   const [traffic_gen_list, set_traffic_gen_list] = useState<TrafficGenList>(
@@ -44,6 +51,9 @@ const ListSettings = () => {
   const [currentTestMode, setCurrentTestMode] = useState(
     parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
   );
+
+  console.log(currentTest?.duration);
+  console.log(currentTest);
 
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [key, setKey] = useState<string>("");
@@ -61,6 +71,7 @@ const ListSettings = () => {
   const [totalDuration, setTotalDuration] = useState<number>(0);
   const ref = useRef();
 
+  // Hier ist noch die Definition der States
   const handleTestModeChange = (event: any) => {
     const newValue = Number(event.target.value);
     if (
@@ -487,10 +498,20 @@ const ListSettings = () => {
 
     const newMode = parseInt(event.target.value);
 
-    const updatedTest: TrafficGenData = {
+    let updatedTest: TrafficGenData = {
       ...currentTest,
       mode: newMode,
     };
+
+    if (newMode === GenerationMode.POISSON) {
+      updatedTest = {
+        ...updatedTest,
+        streams: currentTest.streams.slice(0, 1),
+        stream_settings: currentTest.stream_settings.filter(
+          (setting) => setting.stream_id === currentTest.streams[0].stream_id
+        ),
+      };
+    }
 
     const updatedTrafficGenList: TrafficGenList = {
       ...traffic_gen_list,
@@ -618,37 +639,39 @@ const ListSettings = () => {
   };
 
   const loadGen = async () => {
-    let stats = await get({ route: "/trafficgen" });
+    let tg = await get({ route: "/trafficgen" });
+    let profile = await get({ route: "/profiles" });
 
-    if (Object.keys(stats.data).length > 1) {
+    if (Object.keys(tg.data).length > 1) {
       let old_gen_string = JSON.stringify(traffic_gen_list);
       let new_gen: TrafficGenList;
 
       set_running(true);
 
-      if (stats.data.all_test) {
-        new_gen = stats.data.all_test;
+      new_gen = tg.data.all_test[1].duration
+        ? tg.data.all_test
+        : { "1": tg.data };
+
+      // Ich will auch nach dem der Test abgeschlossen ist die Profile anzeigen können
+      if (profile.data.message !== "Not running.") {
+        setCurrentTestMode(TestMode.PROFILE);
+      } else if (tg.data.all_test[1].duration) {
         setCurrentTestMode(TestMode.MULTI);
       } else {
-        const single_test = stats.data as TrafficGenData;
-        new_gen = { "1": single_test };
         setCurrentTestMode(TestMode.SINGLE);
       }
 
       let new_gen_string = JSON.stringify(new_gen);
 
-      if (true) {
+      if (new_gen_string !== old_gen_string) {
         localStorage.setItem("traffic_gen", new_gen_string);
         set_traffic_gen_list(new_gen);
 
-        if (stats.data.all_test) {
-          const firstTabKey = Object.keys(new_gen)[0];
-          setCurrentTabIndex(firstTabKey);
-          setCurrentTest(new_gen[firstTabKey as any]);
-        } else {
-          setCurrentTabIndex("1");
-          setCurrentTest(new_gen["1"]);
-        }
+        const firstTabKey = Object.keys(new_gen)[0];
+        setCurrentTabIndex(firstTabKey);
+        setCurrentTest(new_gen[firstTabKey as any]);
+
+        window.location.reload();
       }
     } else {
       set_running(false);
@@ -886,7 +909,7 @@ const ListSettings = () => {
           ))}
         </Tabs>
       ) : (
-        <Profiles />
+        <Profile2 />
       )}
       <input
         style={{ display: "none" }}

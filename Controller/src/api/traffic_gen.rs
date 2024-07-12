@@ -59,7 +59,7 @@ pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
     }
     else {
 
-        let all_test_value = if all_test_list.len() > 1 {
+        let all_test_value = if all_test_list.len() >= 1 {
             let mut btree_map = BTreeMap::new();
             for (index, test_data) in all_test_list.iter().enumerate() {
                 btree_map.insert((index + 1) as u32, test_data.clone());

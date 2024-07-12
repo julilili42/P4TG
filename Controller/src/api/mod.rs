@@ -18,7 +18,7 @@
  */
 pub mod server;
 mod online;
-pub mod statistics;  //pub
+pub mod statistics;  
 mod traffic_gen;
 mod ports;
 mod tables;
@@ -33,8 +33,12 @@ mod docs;
 mod multiple_traffic_gen;
 pub use multiple_traffic_gen::configure_multiple_traffic_gen;
 
+
 mod profiles;
 pub use profiles::profiles_handler;
+pub use profiles::run_all_tests;
+pub use profiles::get_test_results;
+
 
 pub use online::online;
 pub use statistics::statistics;

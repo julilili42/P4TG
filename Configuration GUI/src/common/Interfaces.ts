@@ -302,3 +302,10 @@ export interface TrafficGenList {
 export interface PreviousStatistics {
   [testId: number]: Statistics;
 }
+
+export interface RFCTestResults {
+  throughput: number;
+  latency: number;
+  frame_loss_rate: number;
+  back_to_back: number;
+}

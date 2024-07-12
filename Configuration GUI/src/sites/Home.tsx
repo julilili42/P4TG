@@ -70,7 +70,7 @@ const Home = () => {
     [key: number]: { Summary: string[]; [key: string]: string[] };
   }>({});
 
-  const [test_mode, set_test_mode] = useState(
+  const [test_mode, _] = useState(
     parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
   );
 
@@ -83,7 +83,6 @@ const Home = () => {
   const [time_statistics, set_time_statistics] =
     useState<TimeStatistics>(TimeStatisticsObject);
 
-  const [currentTest, setCurrentTest] = useState<number | null>(null);
   const [selectedTest, setSelectedTest] = useState<{
     statistics: StatInterface | null;
     timeStatistics: TimeStatistics | null;
@@ -94,9 +93,24 @@ const Home = () => {
     trafficGen: null,
   });
 
+  /* 
+Könnte man zusammenfassen als test Number 
+const [testNumber, setTestNumber] = useState<>({currentTestNumber : 1, totalTestsNumber : 1, currentTestDuration : 0});
+
+interface TestNumberState {
+  currentTestNumber: number;
+  totalTestsNumber: number;
+  currentTestDuration: number;
+}
+
+
+   */
   const [currentTestNumber, setCurrentTestNumber] = useState<number>(1);
   const [totalTestsNumber, setTotalTestsNumber] = useState<number>(1);
   const [currentTestDuration, setCurrentTestDuration] = useState<number>(0);
+  const [currentProfileTest, setCurrentProfileTest] = useState<string | null>(
+    null
+  );
 
   const [ports, set_ports] = useState<
     {
@@ -142,6 +156,10 @@ const Home = () => {
       async () => await Promise.all([loadTestInfo()]),
       500
     );
+    const profile_info = setInterval(
+      async () => await Promise.all([loadProfileInfo()]),
+      500
+    );
     const interval_loadgen = setInterval(
       async () => await Promise.all([loadGen()]),
       5000
@@ -154,6 +172,7 @@ const Home = () => {
     return () => {
       clearInterval(interval_stats);
       clearInterval(test_number);
+      clearInterval(profile_info);
       clearInterval(interval_loadgen);
       clearInterval(inverval_timestats);
     };
@@ -242,10 +261,7 @@ const Home = () => {
                 mode: modifiedSingleTest.mode,
               },
             });
-          } else if (
-            test_mode === TestMode.MULTI ||
-            test_mode === TestMode.PROFILE
-          ) {
+          } else if (test_mode === TestMode.MULTI) {
             const traffic_generations = Object.keys(traffic_gen_list).map(
               (test_number: any) => ({
                 streams: traffic_gen_list[test_number].streams,
@@ -263,6 +279,17 @@ const Home = () => {
               body: traffic_generations,
             });
             setTotalTestsNumber(traffic_generations.length);
+          } else if (test_mode === TestMode.PROFILE) {
+            await post({
+              route: "/profiles",
+              body: {
+                streams: traffic_gen_list[1].streams,
+                stream_settings: traffic_gen_list[1].stream_settings,
+                port_tx_rx_mapping: traffic_gen_list[1].port_tx_rx_mapping,
+                mode: traffic_gen_list[1].mode,
+                duration: 10,
+              },
+            });
           }
           set_running(true);
         }
@@ -271,6 +298,9 @@ const Home = () => {
     set_overlay(false);
   };
 
+  // loadTestInfo und loadProfileInfo sind sehr ähnlich, ich könnte sie zusammenfassen
+
+  // Sollte ich nur anfragen falls wir im running = true und test_mode = Multi
   const loadTestInfo = async () => {
     let stats, tg;
     try {
@@ -282,9 +312,9 @@ const Home = () => {
     }
 
     if (tg && tg.status === 200) {
-      const allTests = tg.data.all_test ?? {};
-      const newTotalTestsNumber =
-        Object.keys(allTests).length > 0 ? Object.keys(allTests).length : 1;
+      const allTests = tg.data.all_test;
+      const newTotalTestsNumber = Object.keys(allTests).length;
+
       setTotalTestsNumber(newTotalTestsNumber);
 
       if (stats && stats.status === 200) {
@@ -304,6 +334,44 @@ const Home = () => {
           traffic_gen_list[currentTestNumber]?.duration || 0;
         setCurrentTestDuration(newTestDuration);
       }
+    }
+  };
+
+  // Sollte ich nur anfragen falls wir im running = true und test_mode = Profile
+  const loadProfileInfo = async () => {
+    let profile;
+    try {
+      profile = await get({ route: "/profiles" });
+    } catch (error) {
+      console.error("Error fetching profile info:", error);
+      return;
+    }
+
+    if (profile && profile.status === 200) {
+      const testResults = profile.data;
+
+      const currentTest = Object.keys(testResults).find(
+        (key) => testResults[key] === null
+      );
+
+      let testName = "All tests completed or unknown test state.";
+
+      // das ist unnötig ich kann hier einfach die keys aus dem object anpassen, s.d. der Name den aus dem Switch entspricht
+      switch (currentTest) {
+        case "throughput":
+          testName = "Throughput Test";
+          break;
+        case "latency":
+          testName = "Latency Test";
+          break;
+        case "frame_loss_rate":
+          testName = "Frame Loss Rate Test";
+          break;
+        case "back_to_back":
+          testName = "Back-to-Back Test";
+          break;
+      }
+      setCurrentProfileTest(testName);
     }
   };
 
@@ -345,16 +413,7 @@ const Home = () => {
     }
 
     if (stats && Object.keys(stats.data).length > 1) {
-      const allTests = stats.data.all_test ?? {
-        1: {
-          streams: stats.data.streams,
-          stream_settings: stats.data.stream_settings,
-          port_tx_rx_mapping: stats.data.port_tx_rx_mapping,
-          mode: stats.data.mode,
-          duration: stats.data.duration,
-          name: stats.data.name,
-        },
-      };
+      const allTests = stats.data.all_test;
 
       const trafficGenList: TrafficGenList = Object.fromEntries(
         Object.entries(allTests).map(([testKey, test]: any) => [
@@ -392,6 +451,7 @@ const Home = () => {
     set_overlay(false);
   };
 
+  // Überlegen wie ich es mit den laden der Bilder im Profil Modus mache
   const shouldShowDownloadButton = (
     running: boolean,
     statistics: TimeStatistics
@@ -399,7 +459,8 @@ const Home = () => {
     return (
       !running &&
       Object.keys(statistics.tx_rate_l1).length > 0 &&
-      currentTestNumber === totalTestsNumber
+      currentTestNumber === totalTestsNumber &&
+      test_mode !== TestMode.PROFILE
     );
   };
 
@@ -414,13 +475,11 @@ const Home = () => {
       const portMapping = traffic_gen_list[testId as any].port_tx_rx_mapping;
       const portPairs = activePorts(portMapping);
 
-      // Initialize the test entry with the summary
       newImageMap[Number(testId)] = {
         Summary: newImageData.slice(currentIndex, currentIndex + 6),
       };
       currentIndex += 6;
 
-      // Add port pair data
       portPairs.forEach((pair, index) => {
         const portPairKey = `${pair.tx}`;
         newImageMap[Number(testId)][portPairKey] = newImageData.slice(
@@ -447,8 +506,6 @@ const Home = () => {
       timeStatistics: selectedTimeStatistics,
       trafficGen: selectedTrafficGen,
     });
-
-    setCurrentTest(testNumber);
   };
 
   return (
@@ -456,6 +513,7 @@ const Home = () => {
       <form onSubmit={onSubmit}>
         <Row className={"mb-3"}>
           <SendReceiveMonitor stats={statistics} running={running} />
+          {/* Ich sollte hier weitere bedingungen (siehe pdf button) hinzufügen damit zwicshen den Tests das nicht angezegit wird */}
           <Col className={"text-end col-4"}>
             {running ? (
               <>
@@ -519,35 +577,40 @@ const Home = () => {
             />
           </Form>
         </Col>
-        {running &&
-          (test_mode === TestMode.MULTI || test_mode === TestMode.PROFILE) && (
-            <Col className={"col-auto"}>
-              <OverlayTrigger
-                placement="top"
-                overlay={
-                  test_mode === TestMode.MULTI ? (
-                    <Tooltip id="test-info-tooltip">
-                      Test {currentTestNumber} of {totalTestsNumber}
-                      <br />
-                      Duration {currentTestDuration} seconds
-                    </Tooltip>
-                  ) : (
-                    <Tooltip id="test-info-tooltip">
-                      {traffic_gen_list[1].name}
-                      <br />
-                      Duration {currentTestDuration} seconds
-                    </Tooltip>
-                  )
-                }
-              >
-                <i
-                  className="bi bi-info-circle"
-                  style={{ cursor: "pointer" }}
-                />
-              </OverlayTrigger>{" "}
-              Test info
-            </Col>
-          )}
+        {running && test_mode === TestMode.MULTI && (
+          <Col className={"col-auto"}>
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip id="test-info-tooltip">
+                  Test {currentTestNumber} of {totalTestsNumber}
+                  <br />
+                  Duration {currentTestDuration} seconds
+                </Tooltip>
+              }
+            >
+              <i className="bi bi-info-circle" style={{ cursor: "pointer" }} />
+            </OverlayTrigger>{" "}
+            Test info
+          </Col>
+        )}
+
+        {running && test_mode === TestMode.PROFILE && (
+          <Col className={"col-auto"}>
+            <OverlayTrigger
+              placement="top"
+              overlay={
+                <Tooltip id="test-info-tooltip">
+                  RFC 2544 Profile <br />
+                  {currentProfileTest}
+                </Tooltip>
+              }
+            >
+              <i className="bi bi-info-circle" style={{ cursor: "pointer" }} />
+            </OverlayTrigger>{" "}
+            Profile info
+          </Col>
+        )}
       </Row>
       <Tabs
         defaultActiveKey="current"
