@@ -151,6 +151,7 @@ export const createToC = (
     (sum, array) => sum + array.length,
     0
   );
+
   const addExtraPage = numberOfRows > 23 ? 1 : 0;
 
   doc.setFont("helvetica", "normal");
@@ -237,7 +238,7 @@ export const createToC = (
       doc.text(dots, startX + textWidth + buffer, yPosition);
 
       yPosition += 10;
-      if (yPosition > 290) {
+      if (yPosition > 300) {
         yPosition = 40;
         doc.addPage();
         currentPage += subIndex + 1;

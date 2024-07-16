@@ -35,9 +35,7 @@ pub use multiple_traffic_gen::configure_multiple_traffic_gen;
 
 
 mod profiles;
-pub use profiles::profiles_handler;
-pub use profiles::run_all_tests;
-pub use profiles::get_test_results;
+pub use profiles::{run_tests, get_test_results, abort_test_profile};
 
 
 pub use online::online;

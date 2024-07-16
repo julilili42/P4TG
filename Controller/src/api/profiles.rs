@@ -1,1598 +1,148 @@
 use crate::core::traffic_gen_core::types::*;
-use std::sync::Mutex;
-use std::collections::HashMap;
-use crate::api::multiple_traffic_gen::{start_traffic_gen_with_duration, create_and_store_abort_sender, abort_current_test, reset_and_start_experiment, save_statistics, parse_response};
+use crate::api::multiple_traffic_gen::{start_traffic_gen_with_duration, create_and_store_abort_sender, abort_current_test, save_statistics, parse_response};
+use crate::api::traffic_gen::stop_traffic_gen;
 use crate::api::statistics::{Statistics, statistics};
 
 use std::sync::Arc;
-use log::{info, error};
+use log::{error, info};
 use axum::extract::State;
 use axum::http::StatusCode;
 use crate::AppState;
 use axum::response::{IntoResponse, Json, Response};
+use serde::Deserialize;
 use crate::api::server::Error;
 
-
-lazy_static::lazy_static! {
-    static ref ProfilePayload: Mutex<HashMap<String, TrafficGenData>> = Mutex::new({
-        let mut map = HashMap::new();
-
-        let rfc2544 = TrafficGenData {
-            mode: GenerationMode::Cbr,
-            stream_settings: vec![
-                StreamSetting {
-                    port: 128,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 136,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 144,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 152,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 160,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 168,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 176,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 184,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 60,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 52,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-            ],
-            streams: vec![
-                Stream {
-                    stream_id: 1,
-                    app_id: 1,
-                    frame_size: 1024,
-                    encapsulation: Encapsulation::None,
-                    number_of_lse: None,
-                    traffic_rate: 1.0,
-                    burst: 1,
-                    n_packets: None,
-                    timeout: None,
-                    generation_accuracy: None,
-                    n_pipes: None,
-                    vxlan: false,
-                },
-            ],
-            port_tx_rx_mapping: vec![(128, 136)].into_iter().collect(),
-            duration: Some(10),
-            name: Some("RFC2544".to_string()),
-            all_test: None,
-        };
-
-        let imix = TrafficGenData {
-            mode: GenerationMode::Cbr,
-            stream_settings: vec![
-                // Stream id 1
-                StreamSetting {
-                    port: 128,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 136,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 144,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 152,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 160,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 168,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 176,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 184,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 60,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 52,
-                    stream_id: 1,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-
-                // Stream id 2 
-                StreamSetting {
-                    port: 128,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 2,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 136,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 144,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 152,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 160,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 168,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 176,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 184,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 60,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 52,
-                    stream_id: 2,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-
-                // Stream id 3
-                StreamSetting {
-                    port: 128,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 136,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: true,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 144,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 152,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 160,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 168,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 176,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 184,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 60,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-                StreamSetting {
-                    port: 52,
-                    stream_id: 3,
-                    vlan: Some(Vlan {
-                        vlan_id: 1,
-                        pcp: 0,
-                        dei: 0,
-                        inner_vlan_id: 1,
-                        inner_pcp: 0,
-                        inner_dei: 0,
-                    }),
-                    mpls_stack: None,
-                    ethernet: Ethernet {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                    },
-                    ip: IPv4 {
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        ip_src_mask: "0.0.0.0".parse().unwrap(),
-                        ip_dst_mask: "0.0.0.0".parse().unwrap(),
-                    },
-                    active: false,
-                    vxlan: Some(VxLAN {
-                        eth_src: "32:D5:42:2A:F6:92".to_string(),
-                        eth_dst: "81:E7:9D:E3:AD:47".to_string(),
-                        ip_src: "192.168.178.10".parse().unwrap(),
-                        ip_dst: "192.168.178.11".parse().unwrap(),
-                        ip_tos: 0,
-                        udp_source: 49152,
-                        vni: 1,
-                    }),
-                },
-            ],
-            streams: vec![
-                Stream {
-                    stream_id: 1,
-                    app_id: 1,
-                    frame_size: 64,
-                    encapsulation: Encapsulation::None,
-                    number_of_lse: None,
-                    traffic_rate: 5.8,
-                    burst: 1,
-                    n_packets: None,
-                    timeout: None,
-                    generation_accuracy: None,
-                    n_pipes: None,
-                    vxlan: false,
-                },
-                Stream {
-                    stream_id: 2,
-                    app_id: 2,
-                    frame_size: 512,
-                    encapsulation: Encapsulation::None,
-                    number_of_lse: None,
-                    traffic_rate: 3.3,
-                    burst: 1,
-                    n_packets: None,
-                    timeout: None,
-                    generation_accuracy: None,
-                    n_pipes: None,
-                    vxlan: false,
-                },
-                Stream {
-                    stream_id: 3,
-                    app_id: 3,
-                    frame_size: 1518,
-                    encapsulation: Encapsulation::None,
-                    number_of_lse: None,
-                    traffic_rate: 0.83,
-                    burst: 1,
-                    n_packets: None,
-                    timeout: None,
-                    generation_accuracy: None,
-                    n_pipes: None,
-                    vxlan: false,
-                },
-            ],
-            port_tx_rx_mapping: vec![(128, 136)].into_iter().collect(),
-            duration: Some(60),
-            name: Some("IMIX".to_string()),
-            all_test: None,
-        };
-
-        map.insert("RFC 2544".to_string(), rfc2544);
-        map.insert("IMIX".to_string(), imix);
-        
-        map
-    });
+#[derive(Clone, Debug, Deserialize)]
+pub struct TestRequest {
+    pub test_id: u8,
+    pub payload: TrafficGenData,
 }
-
-pub async fn profiles_handler() -> Json<HashMap<String, TrafficGenData>> {
-    let payload = ProfilePayload.lock().unwrap();
-    Json(payload.clone())
-}
-
-
+/// Method called on GET /profiles
 pub async fn get_test_results(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let test_results = state.multi_test_state.test_results.lock().await;
-    if test_results.running {
-        Json(test_results.clone()).into_response()
-    } else {
-        Json(EmptyResponse{message: "Not running.".to_string()}).into_response()
-    }
+    Json(test_results.clone()).into_response()
 }
-
-
-
-pub async fn run_all_tests(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Response {
-    // Reset the results before starting the tests
+/// Method called on POST /profiles
+pub async fn run_tests(State(state): State<Arc<AppState>>, Json(request): Json<TestRequest>) -> Response {
+    // Reset results before starting tests
     reset_results(Arc::clone(&state)).await;
-
-    // RFC Test is running
-    set_running_flag(&state, true).await;
-    
 
     // Abort any currently running test
     abort_current_test(Arc::clone(&state)).await;
-
+    
     let state_clone = Arc::clone(&state);
-    let payload_clone = payload.clone();
-
+    let payload = request.payload.clone();
+    
+    // Clear collected statistics and traffic generators
+   reset_collected_statistics(Arc::clone(&state)).await;
+ 
     tokio::spawn(async move {
-        info!("Starting throughput test");
-        let throughput_result = match throughput_test(State(Arc::clone(&state_clone)), Json(payload_clone.clone())).await {
-            Ok((status, Json(result))) if status == StatusCode::OK => result,
-            Ok((status, _)) => {
-                error!("Throughput test failed: {}", status);
+        if request.test_id == 0 {
+            // Run all tests
+            if run_all_tests_inner(state_clone, payload).await.is_err() {
                 set_running_flag(&state, false).await;
-                return;
-            },
-            Err(err) => {
-                error!("Throughput test failed: {:?}", err);
+            }
+        } else {
+            // Run a specific test
+            if run_single_test(state_clone, request.test_id, payload).await.is_err() {
                 set_running_flag(&state, false).await;
-                return;
-            },
-        };
-        info!("Throughput test completed successfully: {}", throughput_result);
-
-        // Latency test
-        info!("Starting latency test");
-        let latency_result = match latency_test(State(Arc::clone(&state_clone)), Json(payload_clone.clone())).await {
-            Ok((status, Json(result))) if status == StatusCode::OK => result,
-            Ok((status, _)) => {
-                error!("Latency test failed: {}", status);
-                set_running_flag(&state, false).await;
-                return;
-            },
-            Err(err) => {
-                error!("Latency test failed: {:?}", err);
-                set_running_flag(&state, false).await;
-                return;
-            },
-        };
-        info!("Latency test completed successfully: {}", latency_result);
-
-        // Frame Loss Rate test
-        info!("Starting frame loss rate test");
-        let frame_loss_rate_result = match frame_loss_rate_test(State(Arc::clone(&state_clone)), Json(payload_clone.clone())).await {
-            Ok((status, Json(result))) if status == StatusCode::OK => result,
-            Ok((status, _)) => {
-                error!("Frame loss rate test failed {}", status);
-                set_running_flag(&state, false).await;
-                return;
-            },
-            Err(err) => {
-                error!("Frame loss rate test failed: {:?}", err);
-                set_running_flag(&state, false).await;
-                return;
-            },
-        };
-        info!("Frame loss rate test completed successfully: {}", frame_loss_rate_result);
-
-        // Back-to-Back test
-        info!("Starting back-to-back test");
-        let back_to_back_result = match back_to_back_test(State(Arc::clone(&state_clone)), Json(payload_clone)).await {
-            Ok((status, Json(result))) if status == StatusCode::OK => result,
-            Ok((status, _)) => {
-                error!("Back-to-back test failed: {}", status);
-                set_running_flag(&state, false).await;
-                return;
-            },
-            Err(err) => {
-                error!("Back-to-back test failed: {:?}", err);
-                set_running_flag(&state, false).await;
-                return;
-            },
-        };
-        info!("Back-to-back test completed successfully: {}", back_to_back_result);
-
-        info!("All tests completed successfully");
-
-        set_running_flag(&state, false).await;    
-        // Set the running flag to false after all tests
-        let mut experiment = state_clone.experiment.lock().await;
-        experiment.running = false;
+            }
+        }
     });
+
 
     // Return an immediate response to the client
     StatusCode::OK.into_response()
 }
 
+/// Method called on DELETE /profiles
+
+pub async fn abort_test_profile(State(state): State<Arc<AppState>>) -> Response {
+    info!("Abort RFC2544 test profile");
+    
+    abort_current_test(Arc::clone(&state)).await;
+
+    stop_traffic_gen(State(Arc::clone(&state))).await;
+
+    (StatusCode::OK, Json("RFC2544 aborted")).into_response()
+}
 
 
+
+
+async fn run_all_tests_inner(state: Arc<AppState>, payload: TrafficGenData) -> Result<(), ()> {
+    // Set the running flag to true
+    set_running_flag(&state, true).await;
+
+    // Run all tests sequentially
+    if run_throughput_test(Arc::clone(&state), payload.clone()).await.is_err() {
+        return Err(());
+    }
+    if run_latency_test(Arc::clone(&state), payload.clone()).await.is_err() {
+        return Err(());
+    }
+    if run_frame_loss_rate_test(Arc::clone(&state), payload.clone()).await.is_err() {
+        return Err(());
+    }
+    if run_back_to_back_test(Arc::clone(&state), payload).await.is_err() {
+        return Err(());
+    }
+
+
+    // Set the running flag to false
+    set_running_flag(&state, false).await;
+    Ok(())
+}
+
+async fn run_single_test(state: Arc<AppState>, test_id: u8, payload: TrafficGenData) -> Result<(), ()> {
+    // Set the running flag to true
+    set_running_flag(&state, true).await;
+
+    let result = match test_id {
+        1 => run_throughput_test(Arc::clone(&state), payload).await,
+        2 => run_latency_test(Arc::clone(&state), payload).await,
+        3 => run_frame_loss_rate_test(Arc::clone(&state), payload).await,
+        4 => run_back_to_back_test(Arc::clone(&state), payload).await,
+        _ => Err(()),
+    };
+
+    // Set the running flag to false
+    set_running_flag(&state, false).await;
+
+    result
+}
+
+async fn run_throughput_test(state: Arc<AppState>, payload: TrafficGenData) -> Result<(), ()> {
+    info!("Starting throughput test");
+    let result = throughput_test(State(Arc::clone(&state)), Json(payload)).await;
+    handle_test_result(result, "Throughput").await
+}
+
+async fn run_latency_test(state: Arc<AppState>, payload: TrafficGenData) -> Result<(), ()> {
+    info!("Starting latency test");
+    let result = latency_test(State(Arc::clone(&state)), Json(payload)).await;
+    handle_test_result(result, "Latency").await
+}
+
+async fn run_frame_loss_rate_test(state: Arc<AppState>, payload: TrafficGenData) -> Result<(), ()> {
+    info!("Starting frame loss rate test");
+    let result = frame_loss_rate_test(State(Arc::clone(&state)), Json(payload)).await;
+    handle_test_result(result, "Frame Loss Rate").await
+}
+
+async fn run_back_to_back_test(state: Arc<AppState>, payload: TrafficGenData) -> Result<(), ()> {
+    info!("Starting back-to-back test");
+    let result = back_to_back_test(State(Arc::clone(&state)), Json(payload)).await;
+    handle_test_result(result, "Back-to-back frames").await
+}
 
 pub async fn throughput_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<f32>), Response> {
     abort_current_test(Arc::clone(&state)).await;
-
     info!("Starting traffic generation up to 10 times with 10 seconds each");
 
+    save_tg(Arc::clone(&state), payload.clone(), "Throughput".to_string()).await;
+
     let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
-
-    let payload_clone = vec![payload.clone(); 10];
-    reset_and_start_experiment(Arc::clone(&state), payload_clone).await;
-
     let initial_tx_rate: Vec<f32> = payload.streams.iter().map(|s| s.traffic_rate).collect();
     let mut test_payload = payload.clone();
     let mut max_successful_rate = 0.0;
@@ -1602,13 +152,6 @@ pub async fn throughput_test(State(state): State<Arc<AppState>>, Json(payload): 
             Ok(_) => {
                 info!("Successfully completed traffic generation {}", i + 1);
 
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-                if let Err(err) = save_statistics(Arc::clone(&state), i).await {
-                    error!("Failed to save the statistics of the current test {}: {}", i, err);
-                    return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the current test {}: {}", i, err)))).into_response());
-                }
-
                 let stats_response = statistics(State(Arc::clone(&state))).await;
                 if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
                     let total_packet_loss: u64 = stats.packet_loss.values().sum();
@@ -1617,6 +160,14 @@ pub async fn throughput_test(State(state): State<Arc<AppState>>, Json(payload): 
                     if total_packet_loss == 0 {
                         info!("No packet loss detected, stopping Throughput test.");
                         max_successful_rate = test_payload.streams.iter().map(|s| s.traffic_rate).sum();
+                        
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+                        if let Err(err) = save_statistics(Arc::clone(&state), 1).await {
+                            error!("Failed to save the statistics of the throughput test: {}", err);
+                            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the throughput test: {}", err)))).into_response());
+                        }
+
                         break;
                     } else {
                         for (stream, &initial_rate) in test_payload.streams.iter_mut().zip(initial_tx_rate.iter()) {
@@ -1645,38 +196,38 @@ pub async fn throughput_test(State(state): State<Arc<AppState>>, Json(payload): 
 
 pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<f64>), Response> {
     abort_current_test(Arc::clone(&state)).await;
-
     info!("Starting latency test 20 times with 120 seconds each");
+    
+    
+    // Check if throughput is set and use it if present
+    let throughput_result = {
+        let test_results = state.multi_test_state.test_results.lock().await;
+        test_results.throughput
+    };
+    
+    let mut adjusted_payload = payload.clone();
+    if let Some(throughput) = throughput_result {
+        let stream_count = adjusted_payload.streams.len() as f32;
+        for stream in &mut adjusted_payload.streams {
+            stream.traffic_rate = throughput / stream_count;
+        }
+    }
+    
+    save_tg(Arc::clone(&state), adjusted_payload.clone(), "Latency".to_string()).await;
 
     let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
-
-    let payload_clone = vec![payload.clone(); 20];
-    reset_and_start_experiment(Arc::clone(&state), payload_clone).await;
-
     let mut latencies = Vec::new();
 
-    // 20 tests with 120 seconds each
-    for i in 0..10 {
-        // 20 tests with 120 seconds each
-        match start_traffic_gen_with_duration(Arc::clone(&state), payload.clone(), i, Some(5.0), &mut abort_rx).await {
+    for i in 0..5 {
+        match start_traffic_gen_with_duration(Arc::clone(&state), adjusted_payload.clone(), i, Some(5.0), &mut abort_rx).await {
             Ok(_) => {
                 info!("Successfully completed traffic generation {}", i + 1);
-
-                // Wait for a brief moment before saving statistics
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-                // Save statistics after each test
-                if let Err(err) = save_statistics(Arc::clone(&state), i).await {
-                    error!("Failed to save the statistics of the current test {}: {}", i, err);
-                    return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the current test {}: {}", i, err)))).into_response());
-                }
-
-                // Retrieve and record latency statistics
+                
                 let stats_response = statistics(State(Arc::clone(&state))).await;
                 if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
                     let total_rtt: f64 = stats.rtts.values().map(|rtt| rtt.mean).sum();
                     let avg_rtt = total_rtt / stats.rtts.len() as f64;
-                    let avg_latency_us = avg_rtt / 1000.0;  // Convert to microseconds
+                    let avg_latency_us = (avg_rtt / 2.0) / 1000.0;
                     latencies.push(avg_latency_us);
                     info!("Test {}: Average Latency: {:.4} µs", i + 1, avg_latency_us);
                 } else {
@@ -1689,9 +240,17 @@ pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Jso
             }
         }
     }
+    // Ich kann hier den namen einstellen. Payload name setzen in save_tg
 
-    // Calculate and log the overall average latency
-    let overall_avg_latency: f64 = latencies.iter().sum::<f64>() / latencies.len() as f64;
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    if let Err(err) = save_statistics(Arc::clone(&state), 2).await {
+        error!("Failed to save the statistics of the latency test: {}", err);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the latency test: {}", err)))).into_response());
+    }
+                
+
+    let overall_avg_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
     info!("Overall Average Latency after 20 tests: {:.4} µs", overall_avg_latency);
 
     let result = (StatusCode::OK, Json(overall_avg_latency));
@@ -1702,41 +261,28 @@ pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Jso
     Ok(result)
 }
 
-pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(mut payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<f32>), Response> {
+pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<f32>), Response> {
     abort_current_test(Arc::clone(&state)).await;
-
     info!("Starting frame loss rate test 10 times with 10 seconds each");
 
+
+    save_tg(Arc::clone(&state), payload.clone(), "Frame Loss Rate".to_string()).await;
+
+
     let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
+    let initial_tx_rate: Vec<f32> = payload.streams.iter().map(|s| s.traffic_rate).collect();
+    let mut test_payload = payload.clone();
     let mut previous_tx_rate = 1.0_f32;
     let mut consecutive_zero_loss_tests = 0;
     let mut max_rate = 0.0_f32;
-    let initial_tx_rate: Vec<f32> = payload.streams.iter().map(|s| s.traffic_rate).collect();
 
-    let payload_clone = vec![payload.clone(); 10];
-    reset_and_start_experiment(Arc::clone(&state), payload_clone).await;
+    for i in 0..5 {
+        adjust_traffic_rate(&mut test_payload, &initial_tx_rate, previous_tx_rate);
 
-    for i in 0..10 {
-        let mut adjusted_payload = payload.clone();
-        for (stream, &initial_rate) in adjusted_payload.streams.iter_mut().zip(initial_tx_rate.iter()) {
-            stream.traffic_rate = initial_rate * previous_tx_rate;
-        }
-        payload = adjusted_payload;
-        info!("Test {}: Adjusted Transmission Rates:", i + 1);
-        for stream in &payload.streams {
-            info!("Stream {}: {:.2} Gbps", stream.stream_id, stream.traffic_rate);
-        }
-        match start_traffic_gen_with_duration(Arc::clone(&state), payload.clone(), i, Some(10.0), &mut abort_rx).await {
+        match start_traffic_gen_with_duration(Arc::clone(&state), test_payload.clone(), i, Some(5.0), &mut abort_rx).await {
             Ok(_) => {
                 info!("Successfully completed traffic generation {}", i + 1);
-
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-                if let Err(err) = save_statistics(Arc::clone(&state), i).await {
-                    error!("Failed to save the statistics of the current test {}: {}", i, err);
-                    return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the current test {}: {}", i, err)))).into_response());
-                }
-
+                
                 let stats_response = statistics(State(Arc::clone(&state))).await;
                 if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
                     let total_frames_lost: u64 = stats.packet_loss.values().sum();
@@ -1754,12 +300,20 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(mut p
                         max_rate = previous_tx_rate.max(max_rate);
                         previous_tx_rate *= 0.9;
                         if consecutive_zero_loss_tests == 2 {
-                            info!("Two consecutive tests with 0% frame loss detected. Maximum rate: {:.2}%", max_rate * 100.0);
+                            info!("Two consecutive tests with 0% frame loss detected. Maximum rate: {:.2} Gbps", max_rate);
+
+
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+                            if let Err(err) = save_statistics(Arc::clone(&state), 3).await {
+                                error!("Failed to save the statistics of the frame_loss_rate_test test: {}", err);
+                                return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the frame_loss_rate_test test: {}", err)))).into_response());
+                            }
                             break;
                         }
                     } else {
                         consecutive_zero_loss_tests = 0;
-                        previous_tx_rate *= 0.9; // Reduce rate by 10%
+                        previous_tx_rate *= 0.9;
                     }
                 } else {
                     error!("Failed to retrieve statistics for test {}", i + 1);
@@ -1772,50 +326,47 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(mut p
         }
     }
 
-    let result = (StatusCode::OK, Json(max_rate * 100.0));
+    let result = (StatusCode::OK, Json(max_rate));
     if result.0 == StatusCode::OK {
         let mut test_result = state.multi_test_state.test_results.lock().await;
-        test_result.frame_loss_rate = Some(max_rate * 100.0);
+        test_result.frame_loss_rate = Some(max_rate);
     }
     Ok(result)
 }
 
-pub async fn back_to_back_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<f64>), Response> {
-    // Abort any currently running test
+pub async fn back_to_back_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<u16>), Response> {
     abort_current_test(Arc::clone(&state)).await;
+    info!("Starting back-to-back test with 10 iterations");
 
-    info!("Starting back-to-back test with 50 iterations");
+    save_tg(Arc::clone(&state), payload.clone(), "Back-to-back frames".to_string()).await;
 
     let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
-
-    let mut burst_duration = 5.0_f64; // Start with 2 seconds
+    let mut burst_length = 1000_u16;
     let mut successful_bursts = Vec::new();
 
-    // 50 tests with increasing burst duration
     for i in 0..10 {
-        match start_traffic_gen_with_duration(Arc::clone(&state), payload.clone(), i, Some(burst_duration), &mut abort_rx).await {
+        let mut adjusted_payload = payload.clone();
+        for stream in adjusted_payload.streams.iter_mut() {
+            stream.burst = burst_length;
+        }
+
+        match start_traffic_gen_with_duration(Arc::clone(&state), adjusted_payload.clone(), i, Some(5.0), &mut abort_rx).await {
             Ok(_) => {
                 info!("Successfully completed traffic generation {}", i + 1);
 
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
-                if let Err(err) = save_statistics(Arc::clone(&state), i).await {
-                    error!("Failed to save the statistics of the current test {}: {}", i, err);
-                    return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the current test {}: {}", i, err)))).into_response());
-                }
-
                 let stats_response = statistics(State(Arc::clone(&state))).await;
                 if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
-                    let total_frames_lost: u64 = stats.packet_loss.values().sum();
-                    info!("Test {}: Total Frames Lost: {}", i + 1, total_frames_lost);
+                    let total_frames_sent: u64 = stats.frame_size.values().map(|f| f.tx.iter().map(|v| v.packets).sum::<u128>() as u64).sum();
+                    let total_frames_forwarded: u64 = stats.frame_size.values().map(|f| f.rx.iter().map(|v| v.packets).sum::<u128>() as u64).sum();
+                    info!("Test {}: Total Frames Sent: {}, Total Frames Forwarded: {}", i + 1, total_frames_sent, total_frames_forwarded);
 
-                    if total_frames_lost == 0 {
-                        successful_bursts.push(burst_duration);
-                        burst_duration *= 1.05; // Increase duration by 5%
-                        info!("Burst duration increased to {}", burst_duration);
+                    if total_frames_forwarded == total_frames_sent {
+                        successful_bursts.push(burst_length);
+                        burst_length = (burst_length as f64 * 1.05).round() as u16;
+                        info!("Burst length increased to {}", burst_length);
                     } else {
-                        burst_duration *= 0.95; // Decrease duration by 5%
-                        info!("Burst duration decreased to {}", burst_duration);
+                        burst_length = (burst_length as f64 * 0.95).round() as u16;
+                        info!("Burst length decreased to {}", burst_length);
                     }
                 } else {
                     error!("Failed to retrieve statistics for test {}", i + 1);
@@ -1828,23 +379,46 @@ pub async fn back_to_back_test(State(state): State<Arc<AppState>>, Json(payload)
         }
     }
 
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+    if let Err(err) = save_statistics(Arc::clone(&state), 4).await {
+        error!("Failed to save the statistics of the back_to_back_test: {}", err);
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the back_to_back_test: {}", err)))).into_response());
+    }
+    
+
     let average_successful_burst = if !successful_bursts.is_empty() {
-        successful_bursts.iter().sum::<f64>() / successful_bursts.len() as f64
+        successful_bursts.iter().sum::<u16>() / successful_bursts.len() as u16
     } else {
-        0.0
+        0
     };
 
-    info!("Average successful burst duration after 50 tests: {:.2} seconds", average_successful_burst);
+    info!("Average successful burst length after 10 tests: {} frames", average_successful_burst);
 
     let result = (StatusCode::OK, Json(average_successful_burst));
     if result.0 == StatusCode::OK {
         let mut test_result = state.multi_test_state.test_results.lock().await;
-        test_result.back_to_back = Some(average_successful_burst);
+        test_result.back_to_back = Some(average_successful_burst as f64);
     }
     Ok(result)
 }
 
-
+async fn handle_test_result<T: std::fmt::Debug>(result: Result<(StatusCode, Json<T>), Response>, test_name: &str) -> Result<(), ()> {
+    match result {
+        Ok((status, Json(result))) if status == StatusCode::OK => {
+            info!("{} test completed successfully: {:?}", test_name, result);
+            Ok(())
+        },
+        Ok((status, _)) => {
+            error!("{} test failed: {}", test_name, status);
+            Err(())
+        },
+        Err(err) => {
+            error!("{} test failed: {:?}", test_name, err);
+            Err(())
+        }
+    }
+}
 
 pub async fn reset_results(state: Arc<AppState>) {
     let mut res = state.multi_test_state.test_results.lock().await;
@@ -1853,13 +427,36 @@ pub async fn reset_results(state: Arc<AppState>) {
         latency: None,
         frame_loss_rate: None,
         back_to_back: None,
-        running: false, 
+        running: false,
     };
 }
-
 
 async fn set_running_flag(state: &Arc<AppState>, running: bool) {
     let mut test_results = state.multi_test_state.test_results.lock().await;
     test_results.running = running;
 }
+
+fn adjust_traffic_rate(payload: &mut TrafficGenData, initial_tx_rate: &[f32], previous_tx_rate: f32) {
+    for (stream, &initial_rate) in payload.streams.iter_mut().zip(initial_tx_rate.iter()) {
+        stream.traffic_rate = initial_rate * previous_tx_rate;
+    }
+}
+
+
+pub async fn save_tg(state_clone: Arc<AppState>, payload: TrafficGenData, name: String) {
+    let mut multiple_traffic_generators = state_clone.multi_test_state.multiple_traffic_generators.lock().await;
+    let mut named_payload = payload.clone();
+    named_payload.name = Some(name);
+    multiple_traffic_generators.push(named_payload);
+}
+
+
+pub async fn reset_collected_statistics(state_clone: Arc<AppState>) {
+    let mut collected_statistics = state_clone.multi_test_state.collected_statistics.lock().await;
+    collected_statistics.clear();
+
+    let mut collected_time_statistics = state_clone.multi_test_state.collected_time_statistics.lock().await; 
+    collected_time_statistics.clear();
+}
+
 

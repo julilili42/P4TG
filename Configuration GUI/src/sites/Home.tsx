@@ -133,15 +133,6 @@ interface TestNumberState {
 
     if (stats && stats.status === 200) {
       set_ports(stats.data);
-      if (Object.keys(traffic_gen_list).length === 0) {
-        const defaultData = DefaultTrafficGenData(stats.data);
-        set_traffic_gen_list({ 1: defaultData });
-        localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
-        window.location.reload();
-      }
-      if (!localStorage.getItem("test-mode")) {
-        localStorage.setItem("test-mode", String(TestMode.SINGLE));
-      }
     }
   };
 
@@ -152,17 +143,14 @@ interface TestNumberState {
       async () => await Promise.all([loadStatistics()]),
       500
     );
-    const test_number = setInterval(
-      async () => await Promise.all([loadTestInfo()]),
-      500
-    );
-    const profile_info = setInterval(
-      async () => await Promise.all([loadProfileInfo()]),
-      500
-    );
+    const info = setInterval(async () => await Promise.all([loadInfo()]), 500);
     const interval_loadgen = setInterval(
       async () => await Promise.all([loadGen()]),
       5000
+    );
+    const interval_default_loadgen = setInterval(
+      async () => await Promise.all([loadDefaultGen()]),
+      2000
     );
     const inverval_timestats = setInterval(
       async () => await Promise.all([loadTimeStatistics()]),
@@ -171,9 +159,9 @@ interface TestNumberState {
 
     return () => {
       clearInterval(interval_stats);
-      clearInterval(test_number);
-      clearInterval(profile_info);
+      clearInterval(info);
       clearInterval(interval_loadgen);
+      clearInterval(interval_default_loadgen);
       clearInterval(inverval_timestats);
     };
   }, []);
@@ -194,6 +182,7 @@ interface TestNumberState {
 
   const refresh = async () => {
     await loadGen();
+    await loadDefaultGen();
     await loadStatistics();
     await loadTestInfo();
     await loadPorts();
@@ -205,7 +194,11 @@ interface TestNumberState {
     set_overlay(true);
 
     if (running) {
-      await del({ route: "/trafficgen" });
+      if (test_mode === TestMode.PROFILE) {
+        await del({ route: "/profiles" });
+      } else {
+        await del({ route: "/trafficgen" });
+      }
       set_running(false);
     } else {
       const oneModeAnalyze = Object.values(traffic_gen_list).some(
@@ -246,12 +239,6 @@ interface TestNumberState {
                 ? { ...singleTest, streams: [] }
                 : singleTest;
 
-            // Für was brauch ich das?
-            /* localStorage.setItem(
-              "traffic_gen",
-              JSON.stringify({ "1": { ...modifiedSingleTest, duration: 0 } })
-            ); */
-
             await post({
               route: "/trafficgen",
               body: {
@@ -263,15 +250,21 @@ interface TestNumberState {
             });
           } else if (test_mode === TestMode.MULTI) {
             const traffic_generations = Object.keys(traffic_gen_list).map(
-              (test_number: any) => ({
-                streams: traffic_gen_list[test_number].streams,
-                stream_settings: traffic_gen_list[test_number].stream_settings,
-                port_tx_rx_mapping:
-                  traffic_gen_list[test_number].port_tx_rx_mapping,
-                mode: traffic_gen_list[test_number].mode,
-                duration: traffic_gen_list[test_number].duration,
-                name: traffic_gen_list[test_number].name,
-              })
+              (test_number: any) => {
+                const test = traffic_gen_list[test_number];
+                const modifiedTest =
+                  test.mode === GenerationMode.ANALYZE
+                    ? { ...test, streams: [] }
+                    : test;
+                return {
+                  streams: modifiedTest.streams,
+                  stream_settings: modifiedTest.stream_settings,
+                  port_tx_rx_mapping: modifiedTest.port_tx_rx_mapping,
+                  mode: modifiedTest.mode,
+                  duration: modifiedTest.duration,
+                  name: modifiedTest.name,
+                };
+              }
             );
 
             await post({
@@ -283,11 +276,14 @@ interface TestNumberState {
             await post({
               route: "/profiles",
               body: {
-                streams: traffic_gen_list[1].streams,
-                stream_settings: traffic_gen_list[1].stream_settings,
-                port_tx_rx_mapping: traffic_gen_list[1].port_tx_rx_mapping,
-                mode: traffic_gen_list[1].mode,
-                duration: 10,
+                test_id: Number(traffic_gen_list[1].name),
+                payload: {
+                  streams: traffic_gen_list[1].streams,
+                  stream_settings: traffic_gen_list[1].stream_settings,
+                  port_tx_rx_mapping: traffic_gen_list[1].port_tx_rx_mapping,
+                  mode: traffic_gen_list[1].mode,
+                  duration: 10,
+                },
               },
             });
           }
@@ -300,6 +296,14 @@ interface TestNumberState {
 
   // loadTestInfo und loadProfileInfo sind sehr ähnlich, ich könnte sie zusammenfassen
 
+  const loadInfo = async () => {
+    if (test_mode === TestMode.MULTI) {
+      await loadTestInfo();
+    } else if (test_mode === TestMode.PROFILE) {
+      await loadProfileInfo();
+    }
+  };
+
   // Sollte ich nur anfragen falls wir im running = true und test_mode = Multi
   const loadTestInfo = async () => {
     let stats, tg;
@@ -311,7 +315,7 @@ interface TestNumberState {
       return;
     }
 
-    if (tg && tg.status === 200) {
+    if (tg && tg.status === 200 && tg.data.all_test) {
       const allTests = tg.data.all_test;
       const newTotalTestsNumber = Object.keys(allTests).length;
 
@@ -356,7 +360,6 @@ interface TestNumberState {
 
       let testName = "All tests completed or unknown test state.";
 
-      // das ist unnötig ich kann hier einfach die keys aus dem object anpassen, s.d. der Name den aus dem Switch entspricht
       switch (currentTest) {
         case "throughput":
           testName = "Throughput Test";
@@ -404,16 +407,16 @@ interface TestNumberState {
   };
 
   const loadGen = async () => {
-    let stats;
+    let tg;
     try {
-      stats = await get({ route: "/trafficgen" });
+      tg = await get({ route: "/trafficgen" });
     } catch (error) {
       console.error("Error fetching traffic gen data:", error);
       return;
     }
 
-    if (stats && Object.keys(stats.data).length > 1) {
-      const allTests = stats.data.all_test;
+    if (tg && Object.keys(tg.data).length > 1 && tg.data.all_test) {
+      const allTests = tg.data.all_test;
 
       const trafficGenList: TrafficGenList = Object.fromEntries(
         Object.entries(allTests).map(([testKey, test]: any) => [
@@ -438,6 +441,26 @@ interface TestNumberState {
     }
   };
 
+  const loadDefaultGen = async () => {
+    let stats = await get({ route: "/ports" });
+    if (stats.status === 200) {
+      const trafficGenData = JSON.parse(
+        localStorage.getItem("traffic_gen") ?? "{}"
+      );
+
+      if (Object.keys(trafficGenData).length === 0) {
+        const defaultData = DefaultTrafficGenData(stats.data);
+        set_traffic_gen_list({ 1: defaultData });
+        localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
+        window.location.reload();
+      }
+      if (!localStorage.getItem("test-mode")) {
+        localStorage.setItem("test-mode", String(TestMode.SINGLE));
+        window.location.reload();
+      }
+    }
+  };
+
   const reset = async () => {
     set_overlay(true);
     await get({ route: "/reset" });
@@ -459,8 +482,8 @@ interface TestNumberState {
     return (
       !running &&
       Object.keys(statistics.tx_rate_l1).length > 0 &&
-      currentTestNumber === totalTestsNumber &&
-      test_mode !== TestMode.PROFILE
+      currentTestNumber === totalTestsNumber /* &&
+      test_mode !== TestMode.PROFILE */
     );
   };
 

@@ -77,8 +77,6 @@ pub async fn traffic_gen(State(state): State<Arc<AppState>>) -> Response {
         };
 
 
-
-
         let tg_data = TrafficGenData {
             mode: tg.mode,
             stream_settings: tg.stream_settings.clone(),

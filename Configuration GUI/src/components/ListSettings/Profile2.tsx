@@ -7,6 +7,7 @@ import {
   TrafficGenList,
   GenerationMode,
   RFCTestResults,
+  RFC,
 } from "../../common/Interfaces";
 
 import PortMappingTable from "./PortMappingTable";
@@ -18,8 +19,8 @@ import {
   Col,
   Dropdown,
   DropdownButton,
+  Form,
   Row,
-  Table,
 } from "react-bootstrap";
 import InfoBox from "../InfoBox";
 import { AddStreamButton, ResultTable, SaveResetButtons } from "./Utils";
@@ -39,16 +40,22 @@ const Profile2 = () => {
   const [selected_profile, set_selected_profile] = useState<string>("RFC 2544");
 
   const [results, set_results] = useState<RFCTestResults>({
-    throughput: -1,
-    latency: -1,
-    frame_loss_rate: -1,
-    back_to_back: -1,
+    throughput: null,
+    latency: null,
+    frame_loss_rate: null,
+    back_to_back: null,
   });
 
   const [trafficGenList, set_trafficGenList] = useState<TrafficGenList>(
     JSON.parse(localStorage.getItem("traffic_gen") ?? "{}")
   );
   const [currentTest, setCurrentTest] = useState<TrafficGenData | null>(null);
+
+  const [rfc, setRFC] = useState<RFC>(RFC.ALL);
+
+  const handleRFCChange = (event: any) => {
+    setRFC(event.target.value);
+  };
 
   const loadPorts = async () => {
     try {
@@ -64,7 +71,9 @@ const Profile2 = () => {
           });
           setCurrentTest(defaultData);
         } else {
-          setCurrentTest(trafficGenList[1]);
+          const savedCurrentTest = trafficGenList[1];
+          setCurrentTest(savedCurrentTest);
+          setRFC(Number(savedCurrentTest?.name) || RFC.ALL);
         }
       } else {
         console.error("Failed to load ports:", stats);
@@ -80,7 +89,7 @@ const Profile2 = () => {
 
       if (results && results.status === 200) {
         set_results(results.data);
-        if (results.data.message === "Not running.") {
+        if (!results.data.running) {
           set_running(false);
         } else {
           set_running(true);
@@ -102,6 +111,10 @@ const Profile2 = () => {
     loadPorts();
     loadTestResults();
   }, []);
+
+  useEffect(() => {
+    loadTestResults();
+  }, [results]);
 
   const handlePortChange = (event: any, pid: number) => {
     if (!currentTest) return;
@@ -178,7 +191,7 @@ const Profile2 = () => {
     if (!currentTest) return;
 
     const updatedTrafficGenList: TrafficGenList = {
-      "1": { ...currentTest, name: selected_profile },
+      "1": { ...currentTest, name: rfc.toString() },
     };
 
     localStorage.setItem("traffic_gen", JSON.stringify(updatedTrafficGenList));
@@ -213,15 +226,9 @@ const Profile2 = () => {
     window.location.reload();
   };
 
-  const showResults = async () => {
-    let profile = await get({ route: "/profiles" });
-
-    return Object.values(profile)[0] !== "Not running.";
-  };
-
   return (
     <>
-      <Row className="align-items-end">
+      <Row className="align-items-end d-flex justify-content-between">
         <Col className="col-2">
           <DropdownButton
             as={ButtonGroup}
@@ -273,9 +280,25 @@ const Profile2 = () => {
             </>
           </InfoBox>
         </Col>
+        <Col className="col-2">
+          <Form.Text className="text-muted">Selected Test</Form.Text>
+          <Form.Select
+            disabled={running}
+            required
+            onChange={handleRFCChange}
+            className="me-3"
+            value={rfc}
+          >
+            <option value={RFC.ALL}>All</option>
+            <option value={RFC.THROUGHPUT}>Throughput</option>
+            <option value={RFC.LATENCY}>Latency</option>
+            <option value={RFC.FRAME_LOSS_RATE}>Frame-Loss</option>
+            <option value={RFC.BACK_TO_BACK}>Back-To-Back Frames</option>
+          </Form.Select>
+        </Col>
       </Row>
 
-      <ResultTable results={results} />
+      <ResultTable results={results} running={running} />
 
       <StreamTable
         {...{

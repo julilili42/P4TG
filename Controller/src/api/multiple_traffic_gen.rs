@@ -33,6 +33,8 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
 
     let state_clone = Arc::clone(&state);
     let payload_clone = payload.clone();
+    
+    // should be deleted
     let number_of_tests = payload_clone.len();
     
     let mut abort_rx = create_and_store_abort_sender(state_clone.clone()).await;
@@ -109,6 +111,7 @@ pub async fn start_traffic_gen_with_duration(
 
 
 
+
 /// Extracts the HTTP Response body
 pub async fn parse_response<T: DeserializeOwned>(response: Response<axum::body::Body>) -> Result<T, serde_json::Error> {
     let body_bytes = body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
@@ -152,6 +155,7 @@ async fn monitor_test_duration(
             tokio::select! {
                 _ = tokio::time::sleep(remaining_duration.min(Duration::from_millis(100))) => {},
                 _ = abort_rx.changed() => {
+                    info!("Abort signal received during test duration monitoring");
                     return Err(());
                 }
             }
@@ -166,6 +170,7 @@ async fn monitor_test_duration(
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_millis(100)) => {},
                 _ = abort_rx.changed() => {
+                    info!("Abort signal received during infinite test monitoring");
                     return Err(());
                 }
             }
@@ -240,8 +245,10 @@ pub async fn abort_current_test(state: Arc<AppState>) {
     if let Some(abort_tx) = abort_sender {
         // Send the abort signal
         let _ = abort_tx.send(());
+        info!("Abort signal sent");
     }
 }
+
 
 /// Starts single traffic generation
 async fn start_traffic_gen(State(state): State<Arc<AppState>>, payload: Json<TrafficGenData>) -> Response {

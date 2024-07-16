@@ -52,9 +52,6 @@ const ListSettings = () => {
     parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
   );
 
-  console.log(currentTest?.duration);
-  console.log(currentTest);
-
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [key, setKey] = useState<string>("");
   const [currentTabIndex, setCurrentTabIndex] = useState<string | null>(null);
@@ -314,18 +311,32 @@ const ListSettings = () => {
 
   const loadPorts = async () => {
     let stats = await get({ route: "/ports" });
-
     if (stats.status === 200) {
       set_ports(stats.data);
-      if (Object.keys(traffic_gen_list).length === 0) {
+    }
+  };
+
+  const loadDefaultGen = async () => {
+    let stats = await get({ route: "/ports" });
+    if (stats.status === 200) {
+      const trafficGenData = JSON.parse(
+        localStorage.getItem("traffic_gen") ?? "{}"
+      );
+
+      const isAnyStreamEmpty = Object.keys(trafficGenData).some(
+        (key) => trafficGenData[key]?.streams?.length === 0
+      );
+
+      if (Object.keys(trafficGenData).length === 0 || isAnyStreamEmpty) {
         const defaultData = DefaultTrafficGenData(stats.data);
         set_traffic_gen_list({ 1: defaultData });
         localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
         window.location.reload();
       }
-
       if (!localStorage.getItem("test-mode")) {
         localStorage.setItem("test-mode", String(TestMode.SINGLE));
+        setCurrentTestMode(TestMode.SINGLE);
+        window.location.reload();
       }
     }
   };
@@ -503,7 +514,7 @@ const ListSettings = () => {
       mode: newMode,
     };
 
-    if (newMode === GenerationMode.POISSON) {
+    if (newMode === GenerationMode.POISSON && currentTest.streams.length > 0) {
       updatedTest = {
         ...updatedTest,
         streams: currentTest.streams.slice(0, 1),
@@ -653,7 +664,7 @@ const ListSettings = () => {
         : { "1": tg.data };
 
       // Ich will auch nach dem der Test abgeschlossen ist die Profile anzeigen können
-      if (profile.data.message !== "Not running.") {
+      if (profile.data.running) {
         setCurrentTestMode(TestMode.PROFILE);
       } else if (tg.data.all_test[1].duration) {
         setCurrentTestMode(TestMode.MULTI);
@@ -682,6 +693,7 @@ const ListSettings = () => {
     set_loaded(false);
     await loadPorts();
     await loadGen();
+    await loadDefaultGen();
     set_loaded(true);
   };
 
@@ -689,19 +701,22 @@ const ListSettings = () => {
     refresh();
 
     const interval = setInterval(loadGen, 2000);
+    const intervalDefault = setInterval(loadDefaultGen, 2000);
 
     return () => {
       clearInterval(interval);
+      clearInterval(intervalDefault);
     };
   }, []);
 
   useEffect(() => {
-    loadPorts();
+    loadDefaultGen();
     initializeTabs();
   }, [currentTestMode]);
 
   useEffect(() => {
     handleTotalDurationChange(traffic_gen_list);
+    loadDefaultGen();
   }, [traffic_gen_list]);
 
   useEffect(() => {
@@ -836,14 +851,12 @@ const ListSettings = () => {
                     {translate("Generation Mode", currentLanguage)}
                   </Form.Text>
                 </Col>
-                {currentTestMode === TestMode.MULTI ? (
+                {currentTestMode === TestMode.MULTI && (
                   <Col className={"col-2"}>
                     <Form.Text className="text-muted">
                       {translate("Enter Test Duration", currentLanguage)}
                     </Form.Text>
                   </Col>
-                ) : (
-                  <></>
                 )}
               </Row>
 

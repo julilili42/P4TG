@@ -31,7 +31,7 @@ use utoipa::{openapi::security::{ApiKey, ApiKeyValue, SecurityScheme}, Modify, O
 use utoipa_swagger_ui::SwaggerUi;
 
 use tower_http::cors::{Any, CorsLayer};
-use crate::api::{add_port, config, configure_traffic_gen, online, ports, reset, restart, statistics, stop_traffic_gen, traffic_gen, configure_multiple_traffic_gen, profiles_handler, run_all_tests, get_test_results};
+use crate::api::{add_port, config, configure_traffic_gen, online, ports, reset, restart, statistics, stop_traffic_gen, traffic_gen, configure_multiple_traffic_gen, run_tests, get_test_results, abort_test_profile};
 
 
 use crate::api::helper::serve_static_files::{serve_index, static_path};
@@ -145,7 +145,7 @@ pub async fn start_api_server(state: Arc<AppState>) {
         .route("/tables", get(tables))
         .route("/config", get(config))
         .route("/multiple_trafficgen", post(configure_multiple_traffic_gen))
-        .route("/profiles", get(get_test_results).post(run_all_tests))
+        .route("/profiles", get(get_test_results).post(run_tests).delete(abort_test_profile))
         .layer(cors)
         .with_state(Arc::clone(&state));
 

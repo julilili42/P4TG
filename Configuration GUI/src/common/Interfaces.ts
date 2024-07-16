@@ -179,6 +179,14 @@ export enum TestMode {
   PROFILE = 2,
 }
 
+export enum RFC {
+  ALL = 0,
+  THROUGHPUT = 1,
+  LATENCY = 2,
+  FRAME_LOSS_RATE = 3,
+  BACK_TO_BACK = 4,
+}
+
 export interface Stream {
   stream_id: number;
   frame_size: number;
@@ -304,8 +312,8 @@ export interface PreviousStatistics {
 }
 
 export interface RFCTestResults {
-  throughput: number;
-  latency: number;
-  frame_loss_rate: number;
-  back_to_back: number;
+  throughput: number | null;
+  latency: number | null;
+  frame_loss_rate: number | null;
+  back_to_back: number | null;
 }
