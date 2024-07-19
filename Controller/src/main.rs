@@ -92,7 +92,7 @@ async fn configure_ports(switch: &mut SwitchConnection, pm: &PortManager, config
     // TG_PORTS
     for tg in &config.tg_ports {
         let pm_req = Port::new(tg.port , 0)
-            .speed(Speed::BF_SPEED_100G)
+            .speed(Speed::BF_SPEED_10G)
             .fec(FEC::BF_FEC_TYP_NONE)
             .auto_negotiation(AutoNegotiation::PM_AN_DEFAULT);
 
@@ -105,7 +105,7 @@ async fn configure_ports(switch: &mut SwitchConnection, pm: &PortManager, config
     // Recirculation ports
     for port in recirculation_ports {
         let pm_req = Port::new(*port , 0)
-            .speed(Speed::BF_SPEED_100G)
+            .speed(Speed::BF_SPEED_10G)
             .fec(FEC::BF_FEC_TYP_NONE)
             .auto_negotiation(AutoNegotiation::PM_AN_DEFAULT)
             .loopback(Loopback::BF_LPBK_MAC_NEAR);

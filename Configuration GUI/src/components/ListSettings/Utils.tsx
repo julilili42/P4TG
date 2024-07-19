@@ -195,29 +195,37 @@ const ResultTable = ({
                           (Section 26.1)
                         </a>
                       </h4>
-                      Starte einen Datenstrom mit definierten Stream
-                      Sende-Rate(n) durch das DUT (Device Under Test). Die
-                      Stream-Rate(n) wie auch die Frame-Größe kann in dem
-                      Stream-Table eingestellt werden. Es wird die Anzahl der
-                      gesendeten und empfangenen Frames gezählt. Wenn die beiden
-                      Anzahlen gleich sind, wurde der Durchsatz für diese
-                      Senderate erreicht. Der Vorgang wird wiederholt, bis die
-                      maximale Senderate erreicht ist, bei der keine Frames
-                      verloren gehen. Falls mehrere Streams definiert sind, so
-                      wird die Rate der einzelnen Streams entsprechend
-                      reduziert. Der Durchsatz wird in Gbps angegeben. Es werden{" "}
-                      <strong>10 Tests</strong> a <strong>10 Sekunden</strong>{" "}
-                      durchgeführt.
+                      Starte einen Datenstrom mit definierten Stream Sende-Rate
+                      durch das DUT (Device Under Test). Die Stream-Rate wie
+                      auch die Frame-Größe kann in dem Stream-Table eingestellt
+                      werden. Es wird die Anzahl der gesendeten und empfangenen
+                      Frames aufgenommen und über <br />
+                      <code>
+                        Frame Loss Rate = round(((input_count - output_count) *
+                        100) / input_count, 2)
+                      </code>
+                      <br />
+                      die Frame Loss Rate berechnet. Zunächst wird über
+                      exponentieller Suche, beginnend mit der angegebenen
+                      Senderate, nach dem Interval gesucht auf dem im Anschluss
+                      eine Binäre Suche ausgeführt wird.
+                      <br />
+                      Falls die Frame Loss Rate 0 ist, wird die untere Grenze
+                      des Intervalls erhöht, andernfalls wird die obere Grenze
+                      des Intervalls verringert.
+                      <br />
+                      Die Exponentielle und die Binäre Suche werden beide
+                      höchstens in 10 Iterrationen ausgeführt. Dabei liegt die
+                      Dauer eines Tests bei 10 Sekunden.
                       <br />
                       <br />
                       <strong>Vorgehensweise:</strong>
                       <ol>
-                        <li>Beginn mit angegebener Stream Sende-Rate(n).</li>
-                        <li>Zählen der gesendeten und empfangenen Frames.</li>
                         <li>
-                          Falls Frames verloren gehen, reduziere die
-                          Sende-Rate(n) und wiederhole den Test.
+                          Beginn mit angegebener Stream Sende-Rate Exponentielle
+                          Suche und finde Senderaten-Intervall{" "}
                         </li>
+                        <li>Starte Binäre Suche auf Senderaten-Intervall </li>
                       </ol>
                     </>
                   </InfoBox>
@@ -365,6 +373,19 @@ const ResultTable = ({
                     </>
                   </InfoBox>
                 </th>
+                <th>
+                  Reset{" "}
+                  <InfoBox>
+                    <>
+                      <h4>
+                        Reset-Test{" "}
+                        <a href="https://www.ietf.org/rfc/rfc2544.txt">
+                          (Section 26.6)
+                        </a>
+                      </h4>
+                    </>
+                  </InfoBox>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -397,6 +418,13 @@ const ResultTable = ({
                       ? "Not finished"
                       : "Not running"
                     : results.back_to_back + " Frames"}
+                </td>
+                <td>
+                  {results.reset == null
+                    ? running
+                      ? "Not finished"
+                      : "Not running"
+                    : results.reset + " s"}
                 </td>
               </tr>
             </tbody>

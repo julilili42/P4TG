@@ -34,9 +34,6 @@ pub async fn configure_multiple_traffic_gen(State(state): State<Arc<AppState>>, 
     let state_clone = Arc::clone(&state);
     let payload_clone = payload.clone();
     
-    // should be deleted
-    let number_of_tests = payload_clone.len();
-    
     let mut abort_rx = create_and_store_abort_sender(state_clone.clone()).await;
     
     reset_and_start_experiment(state_clone.clone(), payload_clone.clone()).await;    

@@ -264,7 +264,9 @@ pub struct TestResult {
     pub(crate) latency: Option<f64>,
     pub(crate) frame_loss_rate: Option<f32>,
     pub(crate) back_to_back: Option<f64>,
+    pub(crate) reset: Option<f64>,
     pub(crate) running: bool, 
+    pub(crate) current_test: Option<String>,
 }
 
 

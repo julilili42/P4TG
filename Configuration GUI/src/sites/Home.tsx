@@ -354,27 +354,11 @@ interface TestNumberState {
     if (profile && profile.status === 200) {
       const testResults = profile.data;
 
-      const currentTest = Object.keys(testResults).find(
-        (key) => testResults[key] === null
-      );
+      const currentTest = testResults.current_test
+        ? testResults.current_test
+        : "All tests completed or unknown test state.";
 
-      let testName = "All tests completed or unknown test state.";
-
-      switch (currentTest) {
-        case "throughput":
-          testName = "Throughput Test";
-          break;
-        case "latency":
-          testName = "Latency Test";
-          break;
-        case "frame_loss_rate":
-          testName = "Frame Loss Rate Test";
-          break;
-        case "back_to_back":
-          testName = "Back-to-Back Test";
-          break;
-      }
-      setCurrentProfileTest(testName);
+      setCurrentProfileTest(currentTest);
     }
   };
 

@@ -185,6 +185,7 @@ export enum RFC {
   LATENCY = 2,
   FRAME_LOSS_RATE = 3,
   BACK_TO_BACK = 4,
+  RESET = 5,
 }
 
 export interface Stream {
@@ -316,4 +317,5 @@ export interface RFCTestResults {
   latency: number | null;
   frame_loss_rate: number | null;
   back_to_back: number | null;
+  reset: number | null;
 }

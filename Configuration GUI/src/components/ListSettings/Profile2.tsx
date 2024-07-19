@@ -44,6 +44,7 @@ const Profile2 = () => {
     latency: null,
     frame_loss_rate: null,
     back_to_back: null,
+    reset: null,
   });
 
   const [trafficGenList, set_trafficGenList] = useState<TrafficGenList>(
@@ -135,56 +136,9 @@ const Profile2 = () => {
     setCurrentTest(updatedTest);
   };
 
-  const removeStream = (id: number) => {
-    if (!currentTest) return;
-
-    const updatedStreams = currentTest.streams.filter(
-      (v) => v.stream_id !== id
-    );
-    const updatedStreamSettings = currentTest.stream_settings.filter(
-      (v) => v.stream_id !== id
-    );
-
-    const updatedTest: TrafficGenData = {
-      ...currentTest,
-      streams: updatedStreams,
-      stream_settings: updatedStreamSettings,
-    };
-
-    setCurrentTest(updatedTest);
-  };
-
-  const addStream = () => {
-    if (!currentTest) return;
-
-    if (currentTest.streams.length > 6) {
-      alert("Only 7 different streams allowed.");
-    } else {
-      let id = 0;
-
-      if (currentTest.streams.length > 0) {
-        id = Math.max(...currentTest.streams.map((s) => s.stream_id));
-      }
-
-      const newStream = DefaultStream(id + 1);
-      const newStreamSettings = ports
-        .filter((v) => v.loopback === "BF_LPBK_NONE")
-        .map((v) => DefaultStreamSettings(id + 1, v.pid));
-
-      const updatedStreams = [...currentTest.streams, newStream];
-      const updatedStreamSettings = [
-        ...(currentTest.stream_settings || []),
-        ...newStreamSettings,
-      ];
-
-      const updatedTest: TrafficGenData = {
-        ...currentTest,
-        streams: updatedStreams,
-        stream_settings: updatedStreamSettings,
-      };
-
-      setCurrentTest(updatedTest);
-    }
+  // Remove this function and make the
+  const removeStream = () => {
+    return;
   };
 
   const save = () => {
@@ -294,6 +248,7 @@ const Profile2 = () => {
             <option value={RFC.LATENCY}>Latency</option>
             <option value={RFC.FRAME_LOSS_RATE}>Frame-Loss</option>
             <option value={RFC.BACK_TO_BACK}>Back-To-Back Frames</option>
+            <option value={RFC.RESET}>Reset</option>
           </Form.Select>
         </Col>
       </Row>
@@ -303,14 +258,6 @@ const Profile2 = () => {
       <StreamTable
         {...{
           removeStream,
-          running,
-          currentTest,
-        }}
-      />
-
-      <AddStreamButton
-        {...{
-          addStream,
           running,
           currentTest,
         }}
