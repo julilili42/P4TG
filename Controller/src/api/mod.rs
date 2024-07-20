@@ -38,6 +38,8 @@ mod profiles;
 pub use profiles::{run_tests, get_test_results, abort_test_profile};
 
 
+mod rfc_tests;
+
 pub use online::online;
 pub use statistics::statistics;
 pub use traffic_gen::traffic_gen;

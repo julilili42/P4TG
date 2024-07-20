@@ -31,6 +31,7 @@ import {
   Stream,
   StreamSettings,
   TrafficGenData,
+  Port,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import InfoBox from "../components/InfoBox";
@@ -61,15 +62,7 @@ const Settings = ({
   showDuration?: boolean;
   TestNumber?: number;
 }) => {
-  const [ports, set_ports] = useState<
-    {
-      pid: number;
-      port: number;
-      channel: number;
-      loopback: string;
-      status: boolean;
-    }[]
-  >([]);
+  const [ports, set_ports] = useState<Port[]>([]);
   const [running, set_running] = useState(false);
   // @ts-ignore
   const [streams, set_streams] = useState<Stream[]>(

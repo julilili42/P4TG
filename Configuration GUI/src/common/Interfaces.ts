@@ -179,7 +179,7 @@ export enum TestMode {
   PROFILE = 2,
 }
 
-export enum RFC {
+export enum RFCTestSelection {
   ALL = 0,
   THROUGHPUT = 1,
   LATENCY = 2,
@@ -279,15 +279,7 @@ export interface TrafficGenData {
   name?: string;
 }
 
-export const DefaultTrafficGenData = (
-  ports: {
-    pid: number;
-    port: number;
-    channel: number;
-    loopback: string;
-    status: boolean;
-  }[]
-) => {
+export const DefaultTrafficGenData = (ports: Port[]) => {
   const initialStreamSettings = ports
     .filter((v) => v.loopback === "BF_LPBK_NONE")
     .map((v) => {
@@ -318,4 +310,12 @@ export interface RFCTestResults {
   frame_loss_rate: number | null;
   back_to_back: number | null;
   reset: number | null;
+}
+
+export interface Port {
+  pid: number;
+  port: number;
+  channel: number;
+  loopback: string;
+  status: boolean;
 }

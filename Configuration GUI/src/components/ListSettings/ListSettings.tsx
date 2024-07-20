@@ -9,6 +9,7 @@ import {
   TrafficGenData,
   TrafficGenList,
   DefaultTrafficGenData,
+  Port,
 } from "../../common/Interfaces";
 import Loader from "../Loader";
 import { GitHub } from "../../sites/Home";
@@ -28,7 +29,6 @@ import {
   validateStreams,
 } from "../../common/Validators";
 import Profile from "./Profile";
-import Profile2 from "./Profile2";
 
 interface Tab {
   eventKey: string;
@@ -56,15 +56,7 @@ const ListSettings = () => {
   const [key, setKey] = useState<string>("");
   const [currentTabIndex, setCurrentTabIndex] = useState<string | null>(null);
   const [running, set_running] = useState(false);
-  const [ports, set_ports] = useState<
-    {
-      pid: number;
-      port: number;
-      channel: number;
-      loopback: string;
-      status: boolean;
-    }[]
-  >([]);
+  const [ports, set_ports] = useState<Port[]>([]);
   const [totalDuration, setTotalDuration] = useState<number>(0);
   const ref = useRef();
 
@@ -922,7 +914,7 @@ const ListSettings = () => {
           ))}
         </Tabs>
       ) : (
-        <Profile2 />
+        <Profile {...{ ports }} />
       )}
       <input
         style={{ display: "none" }}

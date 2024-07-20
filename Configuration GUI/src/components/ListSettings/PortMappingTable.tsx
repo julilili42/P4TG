@@ -1,5 +1,5 @@
 import { Row, Col, Table, Form } from "react-bootstrap";
-import { GenerationMode, TrafficGenData } from "../../common/Interfaces";
+import { GenerationMode, TrafficGenData, Port } from "../../common/Interfaces";
 import StreamSettingsList from "../settings/StreamSettingsList";
 import { StyledCol } from "../../sites/Settings";
 
@@ -9,7 +9,7 @@ const PortMappingTable = ({
   handlePortChange,
   currentTest,
 }: {
-  ports: any[];
+  ports: Port[];
   running: boolean;
   handlePortChange: (event: any, pid: number) => void;
   currentTest: TrafficGenData | null;
@@ -42,7 +42,7 @@ const PortMappingTable = ({
               {ports.map((v, i) => {
                 if (v.loopback === "BF_LPBK_NONE") {
                   const selectValue =
-                    currentTest.port_tx_rx_mapping[v.pid.toString()] || -1;
+                    currentTest.port_tx_rx_mapping[v.pid] || -1;
                   return (
                     <tr key={i}>
                       <StyledCol>

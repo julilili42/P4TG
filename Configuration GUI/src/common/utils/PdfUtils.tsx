@@ -12,7 +12,10 @@ import {
   Statistics,
   Stream,
   StreamSettings,
+  TestMode,
   TrafficGenList,
+  RFCTestResults,
+  Port,
 } from "../Interfaces";
 import autoTable, { UserOptions } from "jspdf-autotable";
 import { jsPDF } from "jspdf";
@@ -27,13 +30,7 @@ const encapsulation: { [key: number]: string } = {
 
 export const getPortAndChannelFromPid = (
   pid: number | string,
-  ports: {
-    pid: number;
-    port: number;
-    channel: number;
-    loopback: string;
-    status: boolean;
-  }[]
+  ports: Port[]
 ) => {
   const numericPid = typeof pid === "string" ? parseInt(pid) : pid;
   const pidData = ports.find((p) => p.pid === numericPid);
@@ -364,20 +361,86 @@ const glossary = [
   ],
 ];
 
+const ReportExplanation =
+  "This report provides a comprehensive overview of the network performance tests conducted using the P4-based 1 Tb/s traffic generator (P4TG). The P4TG is utilized to generate high-speed network traffic, enabling the evaluation of various network parameters under controlled conditions. These tests are designed to measure the network's ability to handle high-speed data transfer, ensuring both efficiency and reliability. Key metrics such as packet loss, round-trip time (RTT), inter-arrival times (IAT), and jitter were recorded to provide insights into the network's performance. The following sections summarize the recorded statistics in the form of data and corresponding graphs, highlighting the network's strengths and identifying potential areas for improvement.";
+
+const rfcExplanation =
+  "The Request for Comments (RFC) 2544, titled 'Benchmarking Methodology for Network Interconnect Devices', provides standardized testing procedures to evaluate the performance metrics of network devices at Layer 2. This methodology enables consistent comparison across manufacturers and devices. In this test run, all (or some) of the RFC 2544 tests were conducted. The throughput test measures the maximum data rate at which no frames are lost. Latency is defined as the time it takes for a frame to travel through the device under test (DUT). Specifically, the one-way latency is used, which measures the time interval between the transmission of a frame by the source and its reception at the destination. The frame loss rate quantifies the percentage of frames that were not forwarded by the DUT under constant load conditions.The back - to - back frames test assesses the device's capability to handle consecutive frames with minimal inter-frame gaps. The system recovery test determines how quickly the DUT returns to normal operation after experiencing an overload condition. Lastly, the reset test measures the time it takes for the DUT to resume normal operation after a device or software reset. In the following table the results of the RFC 2544 tests are summarized.";
+
 export const createTestExplanation = (
   doc: jsPDF,
-  text: string,
+  test_mode: TestMode,
+  rfc_results: RFCTestResults,
+  traffic_gen_list: TrafficGenList,
   startX = 20,
   startY = 35,
   maxWidth = 170
 ) => {
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  const splitTextToSize = doc.splitTextToSize(text, maxWidth);
-  doc.text(splitTextToSize, startX, startY);
-
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  const p4tgExplanation = doc.splitTextToSize(ReportExplanation, maxWidth);
+  doc.text("Test explanation", pageWidth / 2, 25, { align: "center" });
+  doc.text(p4tgExplanation, startX, startY);
+
+  if (test_mode === TestMode.PROFILE) {
+    const frame_size = traffic_gen_list[1].streams[0].frame_size ?? "N/A";
+
+    doc.setFontSize(12);
+    doc.text("RFC explanation", pageWidth / 2, 3 * startY - 10, {
+      align: "center",
+    });
+    const rfcExplenation = doc.splitTextToSize(rfcExplanation, maxWidth);
+    doc.text(rfcExplenation, startX, 3 * startY);
+
+    doc.text(
+      "Used frame sized for RFC2544: " + frame_size + " bytes",
+      pageWidth / 2,
+      5.3 * startY,
+      {
+        align: "center",
+      }
+    );
+    autoTable(doc, {
+      startY: 5.5 * startY,
+      head: [
+        [
+          "Test",
+          "Throughput",
+          "Latency",
+          "Frame-Loss",
+          "Back-To-Back Frames",
+          "Reset",
+        ],
+      ],
+      body: [
+        [
+          "Value",
+          rfc_results.throughput == null
+            ? "N/A"
+            : rfc_results.throughput.toFixed(3) + " Gbps",
+          rfc_results.latency == null
+            ? "N/A"
+            : rfc_results.latency.toFixed(3) + " Gbps",
+          rfc_results.frame_loss_rate == null
+            ? "N/A"
+            : rfc_results.frame_loss_rate.toFixed(3) + " Gbps",
+          rfc_results.back_to_back == null
+            ? "N/A"
+            : rfc_results.back_to_back.toFixed(3) + " Gbps",
+          rfc_results.reset == null
+            ? "N/A"
+            : rfc_results.reset.toFixed(3) + " Gbps",
+        ],
+      ],
+      theme: "plain",
+      styles: { fontSize: 10 },
+      margin: { left: startX },
+      columnStyles: {},
+    });
+  }
 
   doc.setFontSize(17);
   doc.setFont("helvetica", "bold");
@@ -487,13 +550,7 @@ export const formatPortStreamCols = (streams: Stream[]): string[] => {
 
 export const formatPortStreamRows = (
   port_mapping: { [name: number]: number },
-  ports: {
-    pid: number;
-    port: number;
-    channel: number;
-    loopback: string;
-    status: boolean;
-  }[],
+  ports: Port[],
   stream_settings: StreamSettings[],
   streams: Stream[],
   portStreamCols: string[]
@@ -516,13 +573,7 @@ export const formatPortStreamRows = (
 
 export const formatActivePortsRows = (
   port_mapping: { [name: number]: number },
-  ports: {
-    pid: number;
-    port: number;
-    channel: number;
-    loopback: string;
-    status: boolean;
-  }[]
+  ports: Port[]
 ): (string | number)[][] => {
   const rows = [];
 
@@ -693,8 +744,6 @@ export const frameSizeCountRow = (
     relative_rx,
   ];
 };
-export const dummyText =
-  "This report provides a comprehensive overview of the network performance tests conducted using the P4-based 1 Tb/s traffic generator (P4TG). The P4TG is utilized to generate high-speed network traffic, enabling the evaluation of various network parameters under controlled conditions. These tests are designed to measure the network's ability to handle high-speed data transfer, ensuring both efficiency and reliability. Key metrics such as packet loss, round-trip time (RTT), inter-arrival times (IAT), and jitter were recorded to provide insights into the network's performance. The following sections summarize the recorded statistics in the form of data and corresponding graphs, highlighting the network's strengths and identifying potential areas for improvement.";
 
 export const modes: { [key: number]: string } = {
   0: "Generation Mode",

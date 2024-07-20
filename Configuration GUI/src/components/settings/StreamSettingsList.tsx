@@ -17,7 +17,7 @@
  * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
  */
 
-import { Stream, StreamSettings } from "../../common/Interfaces";
+import { Stream, StreamSettings, Port } from "../../common/Interfaces";
 import StreamSettingsElement from "./StreamSettingsElement";
 import React from "react";
 
@@ -30,13 +30,7 @@ const StreamSettingsList = ({
   stream_settings: StreamSettings[];
   streams: Stream[];
   running: boolean;
-  port: {
-    pid: number;
-    port: number;
-    channel: number;
-    loopback: string;
-    status: boolean;
-  };
+  port: Port;
 }) => {
   return (
     <>

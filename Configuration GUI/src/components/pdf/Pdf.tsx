@@ -4,8 +4,11 @@ import { jsPDF } from "jspdf";
 import { get } from "../../common/API";
 import {
   Statistics,
+  TestMode,
   TrafficGenData,
   TrafficGenList,
+  RFCTestResults,
+  Port,
 } from "../../common/Interfaces";
 import {
   get_lost_packets,
@@ -16,7 +19,6 @@ import {
   activePorts,
 } from "../../common/utils/StatisticUtils";
 import {
-  dummyText,
   createAutoTableConfig,
   activePortsCols,
   formatActivePortsRows,
@@ -45,35 +47,50 @@ import { PDFDocument } from "pdf-lib";
 const DownloadPdf = ({
   stats,
   traffic_gen_list,
+  test_mode,
   graph_images,
 }: {
   stats: Statistics;
   traffic_gen_list: TrafficGenList;
+  test_mode: TestMode;
   graph_images: {
     [key: number]: { Summary: string[]; [key: string]: string[] };
   };
 }) => {
-  const [ports, set_ports] = useState<
-    {
-      pid: number;
-      port: number;
-      channel: number;
-      loopback: string;
-      status: boolean;
-    }[]
-  >([]);
+  const [ports, set_ports] = useState<Port[]>([]);
+  const [results, set_results] = useState<RFCTestResults>({
+    throughput: null,
+    latency: null,
+    frame_loss_rate: null,
+    back_to_back: null,
+    reset: null,
+  });
 
   const loadPorts = async () => {
-    let stats = await get({ route: "/ports" });
+    let ports;
+    try {
+      ports = await get({ route: "/ports" });
+    } catch (error) {
+      return;
+    }
 
-    if (stats.status === 200) {
-      set_ports(stats.data);
+    if (ports && ports.status === 200) {
+      set_ports(ports.data);
+    }
+  };
+
+  const loadRFCResults = async () => {
+    const res = await get({ route: "/profiles" });
+
+    if (res && res.status === 200) {
+      set_results(res.data);
     }
   };
 
   useEffect(() => {
     loadPorts();
-  });
+    loadRFCResults();
+  }, []);
 
   const [currentLanguage, setCurrentLanguage] = useState(
     localStorage.getItem("language") || "en-US"
@@ -581,7 +598,7 @@ const DownloadPdf = ({
     const tocPdfBuffer = tocDoc.output("arraybuffer");
 
     const expDoc = new jsPDF("p", "mm", [297, 210]);
-    createTestExplanation(expDoc, dummyText);
+    createTestExplanation(expDoc, test_mode, results, traffic_gen_list);
     const expPdfBuffer = expDoc.output("arraybuffer");
 
     const mergedPdfFile = await mergePdfs([

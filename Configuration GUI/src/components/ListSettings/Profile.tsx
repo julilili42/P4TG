@@ -1,118 +1,108 @@
 import { useEffect, useState } from "react";
-import { get } from "../../common/API";
 import {
-  TrafficGenData,
+  DefaultTrafficGenData,
   DefaultStream,
   DefaultStreamSettings,
+  TrafficGenData,
+  TrafficGenList,
+  GenerationMode,
+  RFCTestResults,
+  RFCTestSelection,
+  Port,
 } from "../../common/Interfaces";
-import StreamTable from "./StreamTable";
-import { AddStreamButton, SaveResetButtons } from "./Utils";
+
 import PortMappingTable from "./PortMappingTable";
+import StreamTable from "./StreamTable";
+
+import { get } from "../../common/API";
 import {
   ButtonGroup,
   Col,
   Dropdown,
   DropdownButton,
-  Row,
   Form,
+  Row,
 } from "react-bootstrap";
 import InfoBox from "../InfoBox";
+import { ResultTable, SaveResetButtons } from "./Utils";
 
-const Profiles = () => {
-  const [profiles, set_profiles] = useState<{ [key: string]: TrafficGenData }>(
-    {}
-  );
+const Profile = ({ ports }: { ports: Port[] }) => {
   const [running, set_running] = useState(false);
-  const [ports, set_ports] = useState<
-    {
-      pid: number;
-      port: number;
-      channel: number;
-      loopback: string;
-      status: boolean;
-    }[]
-  >([]);
-  const [selected_profile, set_selected_profile] = useState<string>("RFC 2544");
-  const [duration, set_duration] = useState<number>(0);
+  const [selected_profile, _] = useState<string>("RFC 2544");
 
-  const loadProfiles = async () => {
-    try {
-      let profiles = await get({ route: "/profiles" });
+  const [results, set_results] = useState<RFCTestResults>({
+    throughput: null,
+    latency: null,
+    frame_loss_rate: null,
+    back_to_back: null,
+    reset: null,
+  });
 
-      if (profiles && profiles.status === 200) {
-        set_profiles(profiles.data);
-        if (profiles.data[selected_profile]) {
-          set_duration(profiles.data[selected_profile].duration ?? 0);
-        }
-      } else {
-        console.error("Failed to load profiles:", profiles);
-      }
-    } catch (error) {
-      console.error("Error loading profiles:", error);
+  const [trafficGenList, set_trafficGenList] = useState<TrafficGenList>(
+    JSON.parse(localStorage.getItem("traffic_gen") ?? "{}")
+  );
+  const [currentTest, setCurrentTest] = useState<TrafficGenData | null>(null);
+
+  const [rfc, setRFC] = useState<RFCTestSelection>(RFCTestSelection.ALL);
+
+  const handleRFCChange = (event: any) => {
+    setRFC(event.target.value);
+  };
+
+  const loadDefaultGen = async () => {
+    if (Object.keys(trafficGenList).length === 0) {
+      const defaultData = DefaultTrafficGenData(ports);
+      set_trafficGenList({
+        ...trafficGenList,
+        [selected_profile]: defaultData,
+      });
+      setCurrentTest(defaultData);
+    } else {
+      const savedCurrentTest = trafficGenList[1];
+      setCurrentTest(savedCurrentTest);
+
+      // Ich sollte denn current RFC im lokalen Speicher speichern
+      setRFC(Number(savedCurrentTest?.name) || RFCTestSelection.ALL);
     }
   };
 
-  const loadPorts = async () => {
+  const loadTestResults = async () => {
     try {
-      let stats = await get({ route: "/ports" });
+      let results = await get({ route: "/profiles" });
 
-      if (stats && stats.status === 200) {
-        set_ports(stats.data);
+      if (results && results.status === 200) {
+        set_results(results.data);
+        if (!results.data.running) {
+          set_running(false);
+        } else {
+          set_running(true);
+        }
       } else {
-        console.error("Failed to load ports:", stats);
+        console.error("Failed to load results:", results);
       }
     } catch (error) {
-      console.error("Error loading ports:", error);
+      console.error("Error loading results:", error);
     }
   };
 
   useEffect(() => {
-    loadProfiles();
-    loadPorts();
+    const savedTrafficGenList = JSON.parse(
+      localStorage.getItem("traffic_gen") ?? "{}"
+    );
+    set_trafficGenList(savedTrafficGenList);
+    setCurrentTest(savedTrafficGenList[selected_profile as any] || null);
+    loadDefaultGen();
+    loadTestResults();
   }, []);
 
-  const removeStream = (id: number) => {
-    const updatedProfiles = { ...profiles };
-    const profile = updatedProfiles[selected_profile as keyof typeof profiles];
-
-    if (!profile) return;
-
-    const updatedStreams = profile.streams.filter(
-      (stream) => stream.stream_id !== id
-    );
-    profile.streams = updatedStreams;
-
-    set_profiles(updatedProfiles);
-  };
-
-  const addStream = () => {
-    const updatedProfiles = { ...profiles };
-    const profile = updatedProfiles[selected_profile as keyof typeof profiles];
-
-    if (!profile) return;
-
-    const newStreamId =
-      profile.streams.length > 0
-        ? Math.max(...profile.streams.map((s) => s.stream_id)) + 1
-        : 1;
-    const newStream = DefaultStream(newStreamId);
-    const newStreamSettings = ports
-      .filter((v) => v.loopback === "BF_LPBK_NONE")
-      .map((v) => DefaultStreamSettings(newStreamId, v.pid));
-
-    profile.streams.push(newStream);
-    profile.stream_settings.push(...newStreamSettings);
-
-    set_profiles(updatedProfiles);
-  };
+  useEffect(() => {
+    loadTestResults();
+  }, [results]);
 
   const handlePortChange = (event: any, pid: number) => {
-    const updatedProfiles = { ...profiles };
-    const profile = updatedProfiles[selected_profile as keyof typeof profiles];
+    if (!currentTest) return;
 
-    if (!profile) return;
-
-    const newPortTxRxMapping = { ...profile.port_tx_rx_mapping };
+    const newPortTxRxMapping = { ...currentTest.port_tx_rx_mapping };
 
     if (parseInt(event.target.value) === -1) {
       delete newPortTxRxMapping[pid];
@@ -120,66 +110,60 @@ const Profiles = () => {
       newPortTxRxMapping[pid] = parseInt(event.target.value);
     }
 
-    updatedProfiles[selected_profile as keyof typeof profiles] = {
-      ...profile,
+    const updatedTest: TrafficGenData = {
+      ...currentTest,
       port_tx_rx_mapping: newPortTxRxMapping,
     };
 
-    set_profiles(updatedProfiles);
+    setCurrentTest(updatedTest);
   };
 
-  const handleDurationChange = (event: any) => {
-    const newDuration = isNaN(parseInt(event.target.value))
-      ? 0
-      : parseInt(event.target.value);
-
-    if (newDuration >= 0) {
-      set_duration(newDuration);
-    }
+  const removeStream = () => {
+    alert("For RFC2544 one stream is required.");
   };
 
   const save = () => {
-    const updatedProfiles = { ...profiles };
-    if (updatedProfiles[selected_profile]) {
-      updatedProfiles[selected_profile].duration = duration;
-    }
-    const trafficGen = {
-      "1": updatedProfiles[selected_profile as keyof typeof profiles],
+    if (!currentTest) return;
+
+    const updatedTrafficGenList: TrafficGenList = {
+      "1": { ...currentTest, name: rfc.toString() },
     };
-    localStorage.setItem("traffic_gen", JSON.stringify(trafficGen));
-    localStorage.setItem("test-mode", String(2));
-    alert(`${selected_profile} settings have been saved.`);
+
+    localStorage.setItem("traffic_gen", JSON.stringify(updatedTrafficGenList));
+    set_trafficGenList(updatedTrafficGenList);
+    alert("Settings saved.");
   };
 
-  const reset = async () => {
-    await loadProfiles();
-    const profile = profiles[selected_profile];
-    if (profile) {
-      set_duration(profile.duration || 0);
-    }
+  const reset = () => {
+    if (!currentTest) return;
+
+    const initialStream = DefaultStream(1);
+    const initialStreamSettings = ports
+      .filter((v) => v.loopback === "BF_LPBK_NONE")
+      .map((v) => DefaultStreamSettings(1, v.pid));
+
+    const updatedTest: TrafficGenData = {
+      ...currentTest,
+      streams: [initialStream],
+      stream_settings: initialStreamSettings,
+      port_tx_rx_mapping: {},
+      mode: GenerationMode.CBR,
+      duration: 0,
+    };
+
+    const updatedTrafficGenList: TrafficGenList = {
+      "1": updatedTest,
+    };
+
+    localStorage.setItem("traffic_gen", JSON.stringify(updatedTrafficGenList));
+    set_trafficGenList(updatedTrafficGenList);
+    setCurrentTest(updatedTest);
     window.location.reload();
   };
 
-  const handleSelectProfile = (profileName: string) => {
-    set_selected_profile(profileName);
-    if (profiles[profileName]) {
-      set_duration(profiles[profileName].duration || 0);
-    }
-  };
-
-  const currentProfile = profiles[selected_profile as keyof typeof profiles];
-
   return (
     <>
-      <Row>
-        <Col className="col-2">
-          <Form.Text className="text-muted">Selected Test</Form.Text>
-        </Col>
-        <Col className="col-2">
-          <Form.Text className="text-muted">Duration</Form.Text>
-        </Col>
-      </Row>
-      <Row className="align-items-end">
+      <Row className="align-items-end d-flex justify-content-between">
         <Col className="col-2">
           <DropdownButton
             as={ButtonGroup}
@@ -187,17 +171,14 @@ const Profiles = () => {
             variant={"secondary"}
             key={"Select Profile"}
             title={selected_profile}
-            onSelect={(eventKey) => handleSelectProfile(eventKey as string)}
           >
-            {Object.keys(profiles).map((profileName) => (
-              <Dropdown.Item
-                eventKey={profileName}
-                active={profileName === selected_profile}
-                key={profileName}
-              >
-                {profileName}
-              </Dropdown.Item>
-            ))}
+            <Dropdown.Item
+              eventKey={"RFC2544"}
+              active={"RFC2544" === selected_profile}
+              key={"RFC2544"}
+            >
+              RFC2544
+            </Dropdown.Item>
           </DropdownButton>
           <InfoBox>
             <>
@@ -231,57 +212,37 @@ const Profiles = () => {
                   Überlastung.
                 </li>
               </ul>
-
-              <h4>IMIX</h4>
-              <p>
-                IMIX (Internet Mix) ist ein Testverfahren, das verwendet wird,
-                um die Leistung von Netzwerkgeräten unter realen Bedingungen zu
-                bewerten. Es berücksichtigt die Tatsache, dass Netzwerkverkehr
-                aus Paketen unterschiedlicher Größe besteht.
-              </p>
-              <h5>Paketgrößen-Mix</h5>
-              <p>
-                IMIX verwendet eine Mischung aus verschiedenen Paketgrößen, um
-                den realen Netzwerkverkehr nachzubilden. Typischerweise werden
-                kleine, mittlere und große Pakete gemischt.
-              </p>
-              <h5>Ziel</h5>
-              <p>
-                Der Zweck des IMIX-Tests ist es, die Leistungsfähigkeit eines
-                Netzwerkgeräts unter realistischen Bedingungen zu bewerten, da
-                reiner Durchsatz- oder Latenztests mit einer einheitlichen
-                Paketgröße nicht die tatsächlichen Netzwerkbedingungen
-                widerspiegeln.
-              </p>
             </>
           </InfoBox>
         </Col>
         <Col className="col-2">
-          <Form>
-            <Form.Control
-              type="number"
-              min={0}
-              placeholder={"Number of seconds"}
-              value={duration}
-              onChange={handleDurationChange}
-              required
-            />
-          </Form>
+          <Form.Text className="text-muted">Selected Test</Form.Text>
+          <Form.Select
+            disabled={running}
+            required
+            onChange={handleRFCChange}
+            className="me-3"
+            value={rfc}
+          >
+            <option value={RFCTestSelection.ALL}>All</option>
+            <option value={RFCTestSelection.THROUGHPUT}>Throughput</option>
+            <option value={RFCTestSelection.LATENCY}>Latency</option>
+            <option value={RFCTestSelection.FRAME_LOSS_RATE}>Frame-Loss</option>
+            <option value={RFCTestSelection.BACK_TO_BACK}>
+              Back-To-Back Frames
+            </option>
+            <option value={RFCTestSelection.RESET}>Reset</option>
+          </Form.Select>
         </Col>
       </Row>
+
+      <ResultTable results={results} running={running} />
+
       <StreamTable
         {...{
           removeStream,
           running,
-          currentTest: currentProfile,
-        }}
-      />
-
-      <AddStreamButton
-        {...{
-          addStream,
-          running,
-          currentTest: currentProfile,
+          currentTest,
         }}
       />
 
@@ -290,13 +251,12 @@ const Profiles = () => {
           ports,
           running,
           handlePortChange,
-          currentTest: currentProfile,
+          currentTest,
         }}
       />
-
       <SaveResetButtons onSave={save} onReset={reset} running={running} />
     </>
   );
 };
 
-export default Profiles;
+export default Profile;

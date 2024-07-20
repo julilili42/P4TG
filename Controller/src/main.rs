@@ -62,7 +62,7 @@ pub struct MultiTest {
     pub(crate) collected_time_statistics: Mutex<Vec<TimeStatistic>>,
     pub(crate) multiple_traffic_generators: Mutex<Vec<TrafficGenData>>,
     pub(crate) abort_sender: Mutex<Option<watch::Sender<()>>>,
-    pub(crate) test_results: Mutex<TestResult>, 
+    pub(crate) rfc_results: Mutex<TestResult>, 
 }
 
 
@@ -237,7 +237,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         collected_statistics: Mutex::new(Vec::new()),
         collected_time_statistics: Mutex::new(Vec::new()),
         multiple_traffic_generators: Mutex::new(Vec::new()),
-        test_results: Mutex::new(TestResult::default()),
+        rfc_results: Mutex::new(TestResult::default()),
         abort_sender: Mutex::new(None),
         },
     });

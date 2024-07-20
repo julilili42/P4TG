@@ -23,6 +23,7 @@ import {
   TrafficGenData,
   TrafficGenList,
   DefaultTrafficGenData,
+  Port,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
@@ -112,15 +113,7 @@ interface TestNumberState {
     null
   );
 
-  const [ports, set_ports] = useState<
-    {
-      pid: number;
-      port: number;
-      channel: number;
-      loopback: string;
-      status: boolean;
-    }[]
-  >([]);
+  const [ports, set_ports] = useState<Port[]>([]);
 
   const loadPorts = async () => {
     let stats;
@@ -562,6 +555,7 @@ interface TestNumberState {
                         data={time_statistics}
                         stats={statistics}
                         traffic_gen_list={traffic_gen_list}
+                        test_mode={test_mode}
                         graph_images={imageData}
                       />
                     </>

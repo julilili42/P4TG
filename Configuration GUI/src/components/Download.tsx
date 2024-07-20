@@ -2,18 +2,20 @@ import { Dropdown } from "react-bootstrap";
 import DownloadCsv from "./csv/Csv";
 import DownloadPdf from "./pdf/Pdf";
 
-import { Statistics, TimeStatistics } from "../common/Interfaces";
+import { Statistics, TestMode, TimeStatistics } from "../common/Interfaces";
 import { TrafficGenList } from "../common/Interfaces";
 
 const Download = ({
   data,
   stats,
   traffic_gen_list,
+  test_mode,
   graph_images,
 }: {
   data: TimeStatistics;
   stats: Statistics;
   traffic_gen_list: TrafficGenList;
+  test_mode: TestMode;
   graph_images: {
     [key: number]: { Summary: string[]; [key: string]: string[] };
   };
@@ -23,6 +25,7 @@ const Download = ({
   const pdfButtonProps = {
     stats,
     traffic_gen_list,
+    test_mode,
     graph_images,
   };
 
