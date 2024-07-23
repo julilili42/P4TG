@@ -24,6 +24,7 @@ import {
   TrafficGenList,
   DefaultTrafficGenData,
   Port,
+  RFCTestSelection,
 } from "../common/Interfaces";
 import styled from "styled-components";
 import StreamView from "../components/StreamView";
@@ -71,8 +72,20 @@ const Home = () => {
     [key: number]: { Summary: string[]; [key: string]: string[] };
   }>({});
 
-  const [test_mode, _] = useState(
-    parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
+  const [testSettings, setTestSettings] = useState<{
+    mode: number;
+    selectedRFC: number;
+  }>(() => {
+    const storedTest = JSON.parse(localStorage.getItem("test") || "{}");
+    return {
+      mode: storedTest.mode ?? TestMode.SINGLE,
+      selectedRFC: storedTest.selectedRFC ?? RFCTestSelection.ALL,
+    };
+  });
+
+  const [test_mode, setTestMode] = useState<number>(testSettings.mode);
+  const [selectedRFC, setSelectedRFC] = useState<number>(
+    testSettings.selectedRFC
   );
 
   const [traffic_gen_list, set_traffic_gen_list] = useState<TrafficGenList>(
@@ -269,7 +282,7 @@ interface TestNumberState {
             await post({
               route: "/profiles",
               body: {
-                test_id: Number(traffic_gen_list[1].name),
+                test_id: selectedRFC,
                 payload: {
                   streams: traffic_gen_list[1].streams,
                   stream_settings: traffic_gen_list[1].stream_settings,
@@ -431,8 +444,14 @@ interface TestNumberState {
         localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
         window.location.reload();
       }
-      if (!localStorage.getItem("test-mode")) {
-        localStorage.setItem("test-mode", String(TestMode.SINGLE));
+      if (!localStorage.getItem("test")) {
+        localStorage.setItem(
+          "test",
+          JSON.stringify({
+            mode: TestMode.SINGLE,
+            selectedRFC: RFCTestSelection.ALL,
+          })
+        );
         window.location.reload();
       }
     }

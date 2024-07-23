@@ -61,8 +61,15 @@ const Profile = ({ ports }: { ports: Port[] }) => {
       const savedCurrentTest = trafficGenList[1];
       setCurrentTest(savedCurrentTest);
 
-      // Ich sollte denn current RFC im lokalen Speicher speichern
-      setRFC(Number(savedCurrentTest?.name) || RFCTestSelection.ALL);
+      const testObj = JSON.parse(localStorage.getItem("test") || "{}");
+
+      if (!testObj) {
+        testObj.selectedRFC = RFCTestSelection.ALL;
+        testObj.mode = 2;
+        localStorage.setItem("test", JSON.stringify(testObj));
+      }
+
+      setRFC(testObj.selectedRFC);
     }
   };
 
@@ -126,9 +133,13 @@ const Profile = ({ ports }: { ports: Port[] }) => {
     if (!currentTest) return;
 
     const updatedTrafficGenList: TrafficGenList = {
-      "1": { ...currentTest, name: rfc.toString() },
+      "1": { ...currentTest },
     };
 
+    localStorage.setItem(
+      "test",
+      JSON.stringify({ mode: 2, selectedRFC: Number(rfc) })
+    );
     localStorage.setItem("traffic_gen", JSON.stringify(updatedTrafficGenList));
     set_trafficGenList(updatedTrafficGenList);
     alert("Settings saved.");
@@ -156,6 +167,10 @@ const Profile = ({ ports }: { ports: Port[] }) => {
     };
 
     localStorage.setItem("traffic_gen", JSON.stringify(updatedTrafficGenList));
+    localStorage.setItem(
+      "test",
+      JSON.stringify({ mode: 2, selectedRFC: RFCTestSelection.ALL })
+    );
     set_trafficGenList(updatedTrafficGenList);
     setCurrentTest(updatedTest);
     window.location.reload();

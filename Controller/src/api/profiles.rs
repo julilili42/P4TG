@@ -57,7 +57,6 @@ pub async fn run_tests(State(state): State<Arc<AppState>>, Json(request): Json<T
 }
 
 /// Method called on DELETE /profiles
-
 pub async fn abort_test_profile(State(state): State<Arc<AppState>>) -> Response {
     info!("Abort RFC2544 test profile");
     
@@ -70,7 +69,6 @@ pub async fn abort_test_profile(State(state): State<Arc<AppState>>) -> Response 
 
 
 async fn run_all_tests_inner(state: Arc<AppState>, payload: TrafficGenData) -> Result<(), ()> {
-    // Set the running flag to true
     set_running_flag(&state, true).await;
 
     // Run all tests sequentially
@@ -90,8 +88,6 @@ async fn run_all_tests_inner(state: Arc<AppState>, payload: TrafficGenData) -> R
         return Err(());
     }
 
-
-    // Set the running flag to false
     set_running_flag(&state, false).await;
     Ok(())
 }
@@ -104,7 +100,7 @@ async fn run_single_test(state: Arc<AppState>, test_id: u8, payload: TrafficGenD
         1 => run_test(Arc::clone(&state), payload, throughput_test, "Throughput").await,
         2 => run_test(Arc::clone(&state), payload, latency_test, "Latency").await,
         3 => run_test(Arc::clone(&state), payload, frame_loss_rate_test, "Frame Loss Rate").await,
-        4 => run_test(Arc::clone(&state), payload, back_to_back_test, "Back-to-back frames").await,
+        4 => run_test(Arc::clone(&state), payload, back_to_back_test, "Back-to-back").await,
         5 => run_test(Arc::clone(&state), payload, reset_test, "Reset").await,
         _ => Err(()),
     };

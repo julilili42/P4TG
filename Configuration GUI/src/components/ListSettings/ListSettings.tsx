@@ -48,8 +48,14 @@ const ListSettings = () => {
   );
   const [currentTest, setCurrentTest] = useState<TrafficGenData | null>(null);
 
-  const [currentTestMode, setCurrentTestMode] = useState(
+  /* const [currentTestMode, setCurrentTestMode] = useState(
     parseInt(localStorage.getItem("test-mode") || String(TestMode.SINGLE))
+  ); */
+
+  const [currentTestMode, setCurrentTestMode] = useState(
+    JSON.parse(
+      localStorage.getItem("test") || '{"mode": ' + TestMode.SINGLE + "}"
+    ).mode
   );
 
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -72,7 +78,8 @@ const ListSettings = () => {
       setTabs([]);
       setTotalDuration(0);
     }
-    localStorage.setItem("test-mode", String(newValue));
+    //localStorage.setItem("test-mode", String(newValue));
+    localStorage.setItem("test", JSON.stringify({ mode: newValue }));
     setCurrentTestMode(newValue);
   };
 
@@ -325,8 +332,8 @@ const ListSettings = () => {
         localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
         window.location.reload();
       }
-      if (!localStorage.getItem("test-mode")) {
-        localStorage.setItem("test-mode", String(TestMode.SINGLE));
+      if (!localStorage.getItem("test")) {
+        localStorage.setItem("test", JSON.stringify({ mode: TestMode.SINGLE }));
         setCurrentTestMode(TestMode.SINGLE);
         window.location.reload();
       }

@@ -265,7 +265,6 @@ pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Jso
 
 
 // Frame loss rate test defined in RFC 2544 section 25.3
-// TO CHANGE: Remove sumulated packet loss
 pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<f32>), Response> {
     abort_current_test(Arc::clone(&state)).await;
     info!("Starting frame loss rate test 10 times with 10 seconds each");
@@ -353,7 +352,7 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(paylo
 }
 
 
-
+// Back-to-Back test defined in RFC 2544 section 25.4
 pub async fn back_to_back_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<u16>), Response> {
     abort_current_test(Arc::clone(&state)).await;
     info!("Starting back-to-back test with 10 iterations");
@@ -423,118 +422,150 @@ pub async fn back_to_back_test(State(state): State<Arc<AppState>>, Json(payload)
     Ok(result)
 }
 
+// Reset test definend in RFC 2544 section 25.6
 pub async fn reset_test(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<TrafficGenData>
-) -> Result<(StatusCode, Json<u16>), Response> {
+) -> Result<(StatusCode, Json<f64>), Response> {
     info!("Starting reset test");
     set_name_flag(&state, "Reset Test".to_string()).await;
 
-    // Bestimmen der Durchsatzrate
     let throughput_rate = {
         let test_results = state.multi_test_state.rfc_results.lock().await;
         test_results.throughput.unwrap_or(payload.streams[0].traffic_rate)
     };
 
-    // Starten des initialen Traffic Streams
     let mut adjusted_payload = payload.clone();
     adjusted_payload.streams[0].traffic_rate = throughput_rate;
     save_tg(Arc::clone(&state), adjusted_payload.clone(), "Reset Test".to_string()).await;
 
-    let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
-
-    // Starten des Traffic Generators für 12 Sekunden und Überwachung kurz vor dem Ende
-    let tg_duration = 12.0;
-    let monitor_duration = tg_duration - 1.0;
     let state_clone = Arc::clone(&state);
+    let mut abort_rx = create_and_store_abort_sender(state_clone.clone()).await;
 
+    // Duration for monitioring and traffic generation
+    let duration = Duration::from_secs(12);
+
+    // Traffic gen task
+    let tg_task = tokio::spawn(async move {
+        start_traffic_gen_with_duration(
+            state_clone,
+            adjusted_payload,
+            0,
+            Some(duration.as_secs_f64()),
+            &mut abort_rx
+        ).await
+    });
+
+    // Monitoring task
+    let state_clone = Arc::clone(&state);
     let monitor_task = tokio::spawn(async move {
-        sleep(Duration::from_secs_f64(monitor_duration)).await;
-        monitor_frames_received(&state_clone).await
+        monitor_packet_loss(&state_clone, 5.0, duration).await
     });
 
-    if let Err(err) = start_traffic_gen_with_duration(Arc::clone(&state), adjusted_payload.clone(), 0, Some(tg_duration), &mut abort_rx).await {
-        error!("Error starting traffic generator: {}", err);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(0)).into_response());
-    }
+    // Wait for either the traffic generation or monitoring to complete
+    let (tg_result, monitor_result) = tokio::join!(tg_task, monitor_task);
 
-    let timestamp_a = match monitor_task.await {
-        Ok(Ok(Some(ts))) => ts,
-        Ok(Ok(None)) => {
-            info!("No reset detected within 12 seconds.");
-            return Ok((StatusCode::OK, Json(0)));
+    // Check results of traffic generation
+    match tg_result {
+        Ok(Ok(())) => info!("Traffic generation completed successfully"),
+        Ok(Err(err)) => {
+            error!("Error starting traffic generator: {}", err);
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Error starting traffic generator: {}", err)))).into_response());
         },
-        Ok(Err(_)) | Err(_) => {
-            error!("Failed to monitor frames received");
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(0)).into_response());
+        Err(err) => {
+            error!("Traffic generation task panicked: {:?}", err);
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new("Traffic generation task panicked".to_string()))).into_response());
         }
-    };
-
-    // Starten des neuen Traffic Streams mit einer geringeren Rate
-    adjusted_payload.streams[0].traffic_rate = throughput_rate * 0.1;
-    save_tg(Arc::clone(&state), adjusted_payload.clone(), "Reset Recovery Test".to_string()).await;
-
-    let recovery_tg_duration = 6.0;
-    let recovery_monitor_duration = recovery_tg_duration - 1.0;
-    let state_clone = Arc::clone(&state);
-
-    let recovery_monitor_task = tokio::spawn(async move {
-        sleep(Duration::from_secs_f64(recovery_monitor_duration)).await;
-        monitor_frames_received(&state_clone).await
-    });
-
-    if let Err(err) = start_traffic_gen_with_duration(Arc::clone(&state), adjusted_payload.clone(), 0, Some(recovery_tg_duration), &mut abort_rx).await {
-        error!("Error starting traffic generator: {}", err);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(0)).into_response());
     }
 
-    let timestamp_b = match recovery_monitor_task.await {
-        Ok(Ok(Some(ts))) => ts,
-        Ok(Ok(None)) => {
-            info!("No frames received within the recovery period.");
-            return Ok((StatusCode::OK, Json(0)));
+    // Check results of monitoring
+    match monitor_result {
+        Ok(Ok((duration_a, duration_b))) => {
+            if duration_a.is_none() {
+                info!("No significant packet loss detected within 120 seconds.");
+                return Ok((StatusCode::OK, Json(0.0)));
+            }
+            let duration_a = duration_a.unwrap();
+            info!("Duration A: {:?}", duration_a);
+
+            if duration_b.is_none() {
+                info!("No packet loss recovery detected.");
+                return Ok((StatusCode::OK, Json(0.0)));
+            }
+            let duration_b = duration_b.unwrap();
+            info!("Duration B: {:?}", duration_b);
+
+            // Recovery interval
+            let recovery_time = duration_b - duration_a;
+            let recovery_time_secs = recovery_time.as_secs_f64();
+            info!("Recovery time after reset: {:.3} seconds", recovery_time_secs);
+
+            // Save results
+            if let Err(err) = save_statistics(Arc::clone(&state), 5).await {
+                error!("Failed to save the statistics of the reset test: {}", err);
+                return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the reset test: {}", err)))).into_response());
+            }
+
+            let mut test_result = state.multi_test_state.rfc_results.lock().await;
+            test_result.reset = Some(recovery_time_secs);
+
+            Ok((StatusCode::OK, Json(recovery_time_secs)))
         },
-        Ok(Err(_)) | Err(_) => {
-            error!("Failed to monitor frames received");
-            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(0)).into_response());
+        Ok(Err(err)) => {
+            error!("Error in packet loss monitoring: {:?}", err);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new("Error in packet loss monitoring".to_string()))).into_response())
+        },
+        Err(err) => {
+            error!("Packet loss monitoring task panicked: {:?}", err);
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new("Packet loss monitoring task panicked".to_string()))).into_response())
         }
-    };
-
-    // Berechnung der Zeitdifferenz zwischen Timestamp A und Timestamp B
-    let recovery_time = timestamp_b.duration_since(timestamp_a).as_secs_f64();
-    info!("Recovery time after reset: {:.3} seconds", recovery_time);
-
-    // Speichern der Ergebnisse
-    if let Err(err) = save_statistics(Arc::clone(&state), 5).await {
-        error!("Failed to save the statistics of the reset test: {}", err);
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(0)).into_response());
     }
-
-    let mut test_result = state.multi_test_state.rfc_results.lock().await;
-    test_result.reset = Some(recovery_time);
-
-    Ok((StatusCode::OK, Json(recovery_time as u16)))
 }
 
-async fn monitor_frames_received(state: &Arc<AppState>) -> Result<Option<Instant>, ()> {
-    // Überprüfen der Statistiken
-    let stats_response = statistics(State(Arc::clone(state))).await;
-    if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
-        let total_frames_received: u64 = stats.frame_size.values()
-            .flat_map(|f| f.rx.iter())
-            .map(|v| v.packets as u64)
-            .sum();
+async fn monitor_packet_loss(state: &Arc<AppState>, threshold: f64, monitoring_duration: Duration) -> Result<(Option<Duration>, Option<Duration>), Response> {
+    let start_time = Instant::now();
 
-        if total_frames_received == 0 {
-            return Ok(Some(Instant::now()));
+    let mut duration_a: Option<Duration> = None;
+
+    while Instant::now().duration_since(start_time) < monitoring_duration {
+        
+        info!("{:?} - {:?}", Instant::now().duration_since(start_time), monitoring_duration);
+
+        sleep(Duration::from_millis(100)).await; 
+
+        let stats_response = statistics(State(Arc::clone(state))).await;
+        if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
+            let total_packets_sent: u64 = stats.frame_size.values()
+                .flat_map(|f| f.tx.iter())
+                .map(|v| v.packets as u64)
+                .sum();
+
+            let packet_loss: u64 = stats.packet_loss.values().sum();
+            let packet_loss_percent = if total_packets_sent > 0 {
+                (packet_loss as f64 / total_packets_sent as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            info!("Packet loss percentage: {:.2}%", packet_loss_percent);
+
+            if packet_loss_percent > threshold && duration_a.is_none() {
+                duration_a = Some(Instant::now().duration_since(start_time));
+                info!("Duration A: {:?}", duration_a);
+            }
+
+            if packet_loss_percent == 0.0 && duration_a.is_some() {
+                let duration_b = Some(Instant::now().duration_since(start_time));
+                info!("Duration B: {:?}", duration_b);
+                return Ok((duration_a, duration_b));
+            }
+        } else {
+            error!("Failed to retrieve statistics");
         }
-    } else {
-        error!("Failed to retrieve statistics");
     }
 
-    Ok(None)
+    Ok((duration_a, None))
 }
-
 
 pub async fn handle_test_result<T: std::fmt::Debug>(result: Result<(StatusCode, Json<T>), Response>, test_name: &str) -> Result<(), ()> {
     match result {
@@ -571,12 +602,10 @@ pub async fn set_running_flag(state: &Arc<AppState>, running: bool) {
     test_results.running = running;
 }
 
-
 pub async fn set_name_flag(state: &Arc<AppState>, name: String) {
     let mut test_results = state.multi_test_state.rfc_results.lock().await;
     test_results.current_test = Some(name);
 }
-
 
 async fn save_tg(state_clone: Arc<AppState>, payload: TrafficGenData, name: String) {
     let mut multiple_traffic_generators = state_clone.multi_test_state.multiple_traffic_generators.lock().await;
@@ -585,16 +614,19 @@ async fn save_tg(state_clone: Arc<AppState>, payload: TrafficGenData, name: Stri
     multiple_traffic_generators.push(named_payload);
 }
 
-
 pub async fn reset_collected_statistics(state_clone: Arc<AppState>) {
     let mut collected_statistics = state_clone.multi_test_state.collected_statistics.lock().await;
     collected_statistics.clear();
 
     let mut collected_time_statistics = state_clone.multi_test_state.collected_time_statistics.lock().await; 
     collected_time_statistics.clear();
-}
 
+    let mut multiple_traffic_generators = state_clone.multi_test_state.multiple_traffic_generators.lock().await;
+    multiple_traffic_generators.clear(); 
+}
 
 fn round_to_three_places(value: f64) -> f64 {
     (value * 1000.0).round() / 1000.0
 }
+
+
