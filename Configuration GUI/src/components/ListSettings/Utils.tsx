@@ -164,7 +164,7 @@ const GenerationModeSelection = ({
   );
 };
 
-const ResultTable = ({
+/* const ResultTable = ({
   results,
   running,
 }: {
@@ -184,7 +184,266 @@ const ResultTable = ({
           >
             <thead className={"table-dark"}>
               <tr>
-                <th>Test</th>
+                <th>
+                  Throughput{" "}
+                  <InfoBox>
+                    <>
+                      <h4>
+                        Throughput-Test{" "}
+                        <a href="https://www.ietf.org/rfc/rfc2544.txt">
+                          (Section 26.1)
+                        </a>
+                      </h4>
+                      Starte einen Datenstrom mit definierten Stream Sende-Rate
+                      durch das DUT (Device Under Test). Die Stream-Rate wie
+                      auch die Frame-Größe kann in dem Stream-Table eingestellt
+                      werden. Es wird die Anzahl der gesendeten und empfangenen
+                      Frames aufgenommen und über <br />
+                      <code>
+                        Frame Loss Rate = round(((input_count - output_count) *
+                        100) / input_count, 2)
+                      </code>
+                      <br />
+                      die Frame Loss Rate berechnet. Zunächst wird über
+                      exponentieller Suche, beginnend mit der angegebenen
+                      Senderate, nach dem Interval gesucht auf dem im Anschluss
+                      eine Binäre Suche ausgeführt wird.
+                      <br />
+                      Falls die Frame Loss Rate 0 ist, wird die untere Grenze
+                      des Intervalls erhöht, andernfalls wird die obere Grenze
+                      des Intervalls verringert.
+                      <br />
+                      Die Exponentielle und die Binäre Suche werden beide
+                      höchstens in 10 Iterrationen ausgeführt. Dabei liegt die
+                      Dauer eines Tests bei 10 Sekunden.
+                      <br />
+                      <br />
+                      <strong>Vorgehensweise:</strong>
+                      <ol>
+                        <li>
+                          Beginn mit angegebener Stream Sende-Rate Exponentielle
+                          Suche und finde Senderaten-Intervall{" "}
+                        </li>
+                        <li>Starte Binäre Suche auf Senderaten-Intervall </li>
+                      </ol>
+                    </>
+                  </InfoBox>
+                </th>
+                <th>
+                  Latency
+                </th>
+                <th>
+                  Frame-Loss
+                </th>
+                <th>
+                  Back-To-Back Frames
+                </th>
+                <th>
+                  Reset
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  {results.throughput == null ? (
+                    running ? (
+                      "Not finished"
+                    ) : (
+                      "Not running"
+                    )
+                  ) : (
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      size="sm"
+                      className="mt-1 mb-1"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Frame Size</th>
+                          <th>Throughput</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(results.throughput).map(
+                          ([size, throughput]) => (
+                            <tr key={size}>
+                              <td>{size} Bytes</td>
+                              <td>{throughput.toFixed(3)} Gbps</td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </Table>
+                  )}
+                </td>
+                <td>
+                  {results.latency == null ? (
+                    running ? (
+                      "Not finished"
+                    ) : (
+                      "Not running"
+                    )
+                  ) : (
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      size="sm"
+                      className="mt-1 mb-1"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Frame Size</th>
+                          <th>Latency</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(results.latency).map(
+                          ([size, latency]) => (
+                            <tr key={size}>
+                              <td>{size} Bytes</td>
+                              <td>{latency.toFixed(3)} µs</td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </Table>
+                  )}
+                </td>
+                <td>
+                  {results.frame_loss_rate == null ? (
+                    running ? (
+                      "Not finished"
+                    ) : (
+                      "Not running"
+                    )
+                  ) : (
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      size="sm"
+                      className="mt-1 mb-1"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Frame Size</th>
+                          <th>Frame Loss Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(results.frame_loss_rate).map(
+                          ([size, frame_loss_rate]) => (
+                            <tr key={size}>
+                              <td>{size} Bytes</td>
+                              <td>{frame_loss_rate.toFixed(3)} Gbps</td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </Table>
+                  )}
+                </td>
+                <td>
+                  {results.back_to_back == null ? (
+                    running ? (
+                      "Not finished"
+                    ) : (
+                      "Not running"
+                    )
+                  ) : (
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      size="sm"
+                      className="mt-1 mb-1"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Frame Size</th>
+                          <th>Back-to-back</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(results.back_to_back).map(
+                          ([size, back_to_back]) => (
+                            <tr key={size}>
+                              <td>{size} Bytes</td>
+                              <td>{back_to_back.toFixed(3)} Frames</td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </Table>
+                  )}
+                </td>
+                <td>
+                  {results.reset == null ? (
+                    running ? (
+                      "Not finished"
+                    ) : (
+                      "Not running"
+                    )
+                  ) : (
+                    <Table
+                      striped
+                      bordered
+                      hover
+                      size="sm"
+                      className="mt-1 mb-1"
+                    >
+                      <thead>
+                        <tr>
+                          <th>Frame Size</th>
+                          <th>Reset</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(results.reset).map(([size, reset]) => (
+                          <tr key={size}>
+                            <td>{size} Bytes</td>
+                            <td>{reset.toFixed(3)} s</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </Table>
+        </Col>
+      </Row>
+    </>
+  );
+}; */
+
+const ResultTable = ({
+  results,
+  running,
+}: {
+  results: RFCTestResults;
+  running: boolean;
+}) => {
+  const frameSizes = ["64", "128", "512", "1024", "1518"];
+  return (
+    <>
+      <Row>
+        <Col>
+          <Table
+            striped
+            bordered
+            hover
+            size="sm"
+            className={"mt-3 mb-3 text-center"}
+          >
+            <thead className={"table-dark"}>
+              <tr>
+                <th>Frame Size</th>
                 <th>
                   Throughput{" "}
                   <InfoBox>
@@ -389,44 +648,46 @@ const ResultTable = ({
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Value</td>
-                <td>
-                  {results.throughput == null
-                    ? running
+              {frameSizes.map((size: string) => (
+                <tr key={size}>
+                  <td>{size} Bytes</td>
+                  <td>
+                    {results.throughput?.[size] !== undefined
+                      ? `${results.throughput[size].toFixed(3)} Gbps`
+                      : running
                       ? "Not finished"
-                      : "Not running"
-                    : results.throughput.toFixed(3) + " Gbps"}
-                </td>
-                <td>
-                  {results.latency == null
-                    ? running
+                      : "Not running"}
+                  </td>
+                  <td>
+                    {results.latency?.[size] !== undefined
+                      ? `${results.latency[size].toFixed(3)} µs`
+                      : running
                       ? "Not finished"
-                      : "Not running"
-                    : results.latency.toFixed(3) + " µs"}
-                </td>
-                <td>
-                  {results.frame_loss_rate == null
-                    ? running
+                      : "Not running"}
+                  </td>
+                  <td>
+                    {results.frame_loss_rate?.[size] !== undefined
+                      ? `${results.frame_loss_rate[size].toFixed(3)} Gbps`
+                      : running
                       ? "Not finished"
-                      : "Not running"
-                    : results.frame_loss_rate.toFixed(3) + " Gbps"}
-                </td>
-                <td>
-                  {results.back_to_back == null
-                    ? running
+                      : "Not running"}
+                  </td>
+                  <td>
+                    {results.back_to_back?.[size] !== undefined
+                      ? `${results.back_to_back[size]} Frames`
+                      : running
                       ? "Not finished"
-                      : "Not running"
-                    : results.back_to_back + " Frames"}
-                </td>
-                <td>
-                  {results.reset == null
-                    ? running
+                      : "Not running"}
+                  </td>
+                  <td>
+                    {results.reset?.[size] !== undefined
+                      ? `${results.reset[size].toFixed(3)} s`
+                      : running
                       ? "Not finished"
-                      : "Not running"
-                    : results.reset + " s"}
-                </td>
-              </tr>
+                      : "Not running"}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </Table>
         </Col>

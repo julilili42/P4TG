@@ -7,7 +7,12 @@ import {
   getStreamIDsByPort,
   formatTime,
   secondsToTime,
+  get_lost_packets,
+  get_out_of_order_packets,
+  calculateWeightedRTTs,
+  calculateWeightedIATs,
 } from "./StatisticUtils";
+
 import {
   Statistics,
   Stream,
@@ -16,10 +21,616 @@ import {
   TrafficGenList,
   RFCTestResults,
   Port,
+  TrafficGenData,
 } from "../Interfaces";
 import autoTable, { UserOptions } from "jspdf-autotable";
 import { jsPDF } from "jspdf";
 import translate from "../../components/translation/Translate";
+import { PDFDocument } from "pdf-lib";
+
+export const createPdf = (
+  testList: TrafficGenList,
+  stats: Statistics,
+  graph_images: { Summary: string[]; [key: string]: string[] },
+  testNumber: number,
+  subHeadersMap: any,
+  ports: Port[],
+  currentLanguage: string
+) => {
+  const current_test = testList[testNumber];
+
+  const test_name = current_test.name || `Test ${testNumber}`;
+
+  const { mode, stream_settings, streams, port_tx_rx_mapping } = current_test;
+
+  const current_statistics = stats.previous_statistics?.[testNumber] || stats;
+
+  const elapsed_time =
+    current_test?.duration || current_statistics.elapsed_time;
+
+  const doc = new jsPDF("p", "mm", [297, 210]);
+  doc.setFont("helvetica", "normal");
+
+  const subHeaders: string[] = [
+    `${translate("Stream Configuration in", currentLanguage)} ${
+      modes[mode as any]
+    } ${translate("mode", currentLanguage)}`,
+    `${translate("Summary", currentLanguage)}`,
+    `${translate("Network Graphs Summary", currentLanguage)}`,
+  ];
+
+  activePorts(port_tx_rx_mapping).forEach((v) => {
+    subHeaders.push(
+      `${translate("Overview", currentLanguage)} ${v.tx} (${
+        getPortAndChannelFromPid(v.tx, ports).port
+      }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`,
+      `${translate("Network Graphs", currentLanguage)} ${v.tx} (${
+        getPortAndChannelFromPid(v.tx, ports).port
+      }) --> ${v.rx} (${getPortAndChannelFromPid(v.rx, ports).port})`
+    );
+  });
+
+  subHeadersMap.current[testNumber] = subHeaders;
+
+  /* Stream Configuration */
+
+  // Active Ports Table
+
+  const activePortsRows = formatActivePortsRows(port_tx_rx_mapping, ports);
+
+  autoTable(
+    doc,
+    createAutoTableConfig(
+      doc,
+      activePortsCols,
+      activePortsRows,
+      {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 30 },
+      },
+      [0, 1, 2, 3, 4, 5],
+      {
+        styles: {
+          halign: "center",
+        },
+        startY: 35,
+      }
+    )
+  );
+
+  // Active Stream Table
+
+  const activeStreamRows = formatActiveStreamRows(streams);
+
+  autoTable(
+    doc,
+    createAutoTableConfig(
+      doc,
+      activeStreamCols,
+      activeStreamRows,
+      {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 35 },
+      },
+      [0, 1, 2, 3, 4, 5, 6],
+      {
+        styles: {
+          halign: "center",
+        },
+      }
+    )
+  );
+
+  // Port stream activation Table
+
+  const portStreamCols = formatPortStreamCols(streams);
+
+  const portStreamRows = formatPortStreamRows(
+    port_tx_rx_mapping,
+    ports,
+    stream_settings,
+    streams,
+    portStreamCols
+  );
+
+  autoTable(
+    doc,
+    createAutoTableConfig(
+      doc,
+      portStreamCols,
+      portStreamRows,
+      { 0: { cellWidth: 25 }, 1: { cellWidth: 25 } },
+      [0, 1, 2, 3, 4, 5, 6, 7, 8],
+      {
+        styles: {
+          halign: "center",
+        },
+      }
+    )
+  );
+
+  doc.addPage();
+
+  /* Summary Table */
+  createSummaryPage(
+    doc,
+    current_statistics,
+    port_tx_rx_mapping,
+    currentLanguage
+  );
+
+  doc.addPage();
+
+  /* Network Graphs Summary */
+
+  graph_images.Summary.forEach((imageData, index) => {
+    doc.addImage(imageData, "JPEG", 15, 35 + 40 * index, 180, 36, "", "FAST");
+  });
+
+  doc.addPage();
+
+  /* Active ports report */
+
+  activePorts(port_tx_rx_mapping).map((v, i, array) => {
+    let mapping: { [name: number]: number } = { [v.tx]: v.rx };
+
+    createSummaryPage(doc, current_statistics, mapping, currentLanguage);
+
+    doc.addPage();
+
+    graph_images[v.tx]?.forEach((imageData, index) => {
+      doc.addImage(imageData, "JPEG", 15, 35 + 40 * index, 180, 36, "", "FAST");
+    });
+
+    // Don't add a new page if it's the last page
+    if (i < array.length - 1) {
+      doc.addPage();
+    }
+  });
+
+  /* Add header and footer to every page */
+  addHeadersAndFooters(doc, elapsed_time, test_name, currentLanguage);
+  addSubHeaders(doc, subHeaders);
+
+  return doc.output("arraybuffer");
+};
+export const createRfcTable = (
+  doc: jsPDF,
+  test: any,
+  graphType:
+    | "throughput"
+    | "latency"
+    | "frame_loss_rate"
+    | "back_to_back"
+    | "reset",
+  yOffset: number
+) => {
+  const frameSizes = ["64", "128", "512", "1024", "1518"];
+
+  const headers = ["Frame Size", ...frameSizes.map((size) => `${size} Bytes`)];
+
+  const createRow = (testType: string, data: any, unit: string) => {
+    return [
+      testType,
+      ...frameSizes.map((size) => {
+        return data && data[size] !== undefined
+          ? `${Number(data[size]).toFixed(3)}${unit}`
+          : "Not running";
+      }),
+    ];
+  };
+
+  const testMappings = {
+    throughput: { label: "Throughput", data: test.throughput, unit: " Gbps" },
+    latency: { label: "Latency", data: test.latency, unit: " ms" },
+    frame_loss_rate: {
+      label: "Frame Loss Rate",
+      data: test.frame_loss_rate,
+      unit: " Gbps",
+    },
+    back_to_back: {
+      label: "Back to Back",
+      data: test.back_to_back,
+      unit: " Frames",
+    },
+    reset: { label: "Reset", data: test.reset, unit: " Seconds" },
+  };
+
+  const selectedTest = testMappings[graphType];
+
+  const data = [
+    createRow(selectedTest.label, selectedTest.data, selectedTest.unit),
+  ];
+
+  autoTable(doc, {
+    head: [headers],
+    body: data,
+    theme: "plain",
+    startY: yOffset,
+    styles: { fontSize: 10, halign: "center" },
+  });
+};
+
+const createSummaryPages = (
+  doc: jsPDF,
+  testList: TrafficGenList,
+  stats: Statistics,
+  currentLanguage: string,
+  start: number,
+  end: number
+) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const keys = Object.keys(testList).slice(start, end);
+
+  keys.forEach((key, index, array) => {
+    const testNumber = Number(key);
+    const current_test = testList[testNumber];
+    const test_name = current_test.name || `Test ${testNumber}`;
+
+    const { port_tx_rx_mapping } = current_test;
+
+    const current_statistics = stats.previous_statistics?.[testNumber] || stats;
+
+    // Create summary page for the current test
+    createSummaryPage(
+      doc,
+      current_statistics,
+      port_tx_rx_mapping,
+      currentLanguage
+    );
+
+    // P4TG Network Report Header
+    doc.setFontSize(17);
+    doc.setFont("helvetica", "bold");
+    doc.text("P4TG Network Report - " + test_name, pageWidth / 2, 15, {
+      align: "center",
+    });
+    doc.setFont("helvetica", "normal");
+
+    doc.setFontSize(12);
+
+    doc.text("Summary", pageWidth / 2, 25, { align: "center" });
+
+    // Add new page unless it's the last test in this batch
+    if (index < array.length - 1) {
+      doc.addPage();
+    }
+  });
+};
+
+const addGraphsAndTables = (
+  doc: jsPDF,
+  graph_images: { Summary: string[]; [key: string]: string[] },
+  rfc_results: RFCTestResults,
+  graphType:
+    | "throughput"
+    | "latency"
+    | "frame_loss_rate"
+    | "back_to_back"
+    | "reset"
+) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const getDisplayName = (test_name: string) => {
+    switch (test_name) {
+      case "throughput":
+        return "Throughput";
+      case "latency":
+        return "Latency";
+      case "frame_loss_rate":
+        return "Frame Loss Rate";
+      case "back_to_back":
+        return "Back to Back";
+      case "reset":
+        return "Reset";
+      default:
+        return test_name;
+    }
+  };
+  doc.setFontSize(17);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    `P4TG Network Report - ${getDisplayName(graphType)}`,
+    pageWidth / 2,
+    15,
+    {
+      align: "center",
+    }
+  );
+  doc.setFont("helvetica", "normal");
+
+  doc.setFontSize(12);
+  doc.text("Test Graph", pageWidth / 2, 25, { align: "center" });
+
+  let yOffset = 35;
+
+  if (graph_images[graphType]) {
+    graph_images[graphType].forEach((imageData) => {
+      doc.addImage(imageData, "JPEG", 15, yOffset, 180, 90, "", "FAST");
+      yOffset += 100; // Adjust yOffset for the next image
+    });
+  }
+
+  // If graphType is "throughput", add the packet_loss image below the throughput image
+  if (graphType === "throughput" && graph_images["packet_loss"]) {
+    graph_images["packet_loss"].forEach((imageData) => {
+      doc.addImage(imageData, "JPEG", 15, yOffset, 180, 90, "", "FAST");
+      yOffset += 100;
+    });
+  }
+
+  createRfcTable(doc, rfc_results, graphType, yOffset);
+};
+
+export const createProfilePdf = (
+  testList: TrafficGenList,
+  stats: Statistics,
+  rfc_results: RFCTestResults,
+  selectedRFC: number,
+  graph_images: { Summary: string[]; [key: string]: string[] },
+  ports: Port[],
+  currentLanguage: string
+) => {
+  const doc = new jsPDF("p", "mm", [297, 210]);
+  doc.setFont("helvetica", "normal");
+
+  const pageSize = 5;
+  const totalTests = Object.keys(testList).length;
+
+  // Determine graph array based on selectedRFC
+  let graphArray: (
+    | "throughput"
+    | "latency"
+    | "frame_loss_rate"
+    | "back_to_back"
+    | "reset"
+  )[];
+  if (selectedRFC === 0) {
+    graphArray = [
+      "throughput",
+      "latency",
+      "frame_loss_rate",
+      "back_to_back",
+      "reset",
+    ];
+  } else if (selectedRFC === 1) {
+    graphArray = ["throughput"];
+  } else if (selectedRFC === 2) {
+    graphArray = ["latency"];
+  } else if (selectedRFC === 3) {
+    graphArray = ["frame_loss_rate"];
+  } else if (selectedRFC === 4) {
+    graphArray = ["back_to_back"];
+  } else if (selectedRFC === 5) {
+    graphArray = ["reset"];
+  } else {
+    graphArray = []; // Default to an empty array if selectedRFC is not 0, 1, 2, 3, 4, or 5
+  }
+
+  for (let i = 0; i < totalTests; i += pageSize) {
+    // Create summary pages for current batch
+    createSummaryPages(
+      doc,
+      testList,
+      stats,
+      currentLanguage,
+      i,
+      Math.min(i + pageSize, totalTests)
+    );
+    doc.addPage();
+
+    // Determine graph type based on current index
+    const graphIndex = (i / pageSize) % graphArray.length;
+    const graphType = graphArray[graphIndex];
+
+    // Add graphs and tables if graphType exists
+    if (graphType) {
+      addGraphsAndTables(doc, graph_images, rfc_results, graphType);
+    }
+
+    // Add new page unless it's the last batch
+    if (i + pageSize < totalTests) {
+      doc.addPage();
+    }
+  }
+
+  return doc.output("arraybuffer");
+};
+
+export const mergePdfs = async (pdfsToMerge: ArrayBuffer[]) => {
+  const mergedPdf = await PDFDocument.create();
+
+  for (const pdfBuffer of pdfsToMerge) {
+    const pdf = await PDFDocument.load(pdfBuffer);
+    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    copiedPages.forEach((page) => {
+      mergedPdf.addPage(page);
+    });
+  }
+
+  const mergedPdfFile = await mergedPdf.save();
+  return mergedPdfFile;
+};
+
+export const calculateStatistics = (
+  current_statistics: Statistics,
+  port_tx_rx_mapping: { [name: number]: number },
+  current_test?: TrafficGenData
+) => {
+  let total_tx = 0;
+  let total_rx = 0;
+
+  Object.keys(current_statistics.frame_size).forEach((v) => {
+    if (Object.keys(port_tx_rx_mapping).includes(v)) {
+      current_statistics.frame_size[v]["tx"].forEach((f: any) => {
+        total_tx += f.packets;
+      });
+    }
+
+    if (Object.values(port_tx_rx_mapping).map(Number).includes(parseInt(v))) {
+      current_statistics.frame_size[v]["rx"].forEach((f: any) => {
+        total_rx += f.packets;
+      });
+    }
+  });
+
+  const rtt = calculateWeightedRTTs(current_statistics, port_tx_rx_mapping);
+  const iat_tx = calculateWeightedIATs(
+    "tx",
+    current_statistics,
+    port_tx_rx_mapping
+  );
+  const iat_rx = calculateWeightedIATs(
+    "rx",
+    current_statistics,
+    port_tx_rx_mapping
+  );
+  const lost_packets = get_lost_packets(current_statistics, port_tx_rx_mapping);
+  const out_of_order_packets = get_out_of_order_packets(
+    current_statistics,
+    port_tx_rx_mapping
+  );
+  const elapsed_time =
+    current_test?.duration || current_statistics.elapsed_time;
+
+  return {
+    total_tx,
+    total_rx,
+    rtt,
+    iat_tx,
+    iat_rx,
+    lost_packets,
+    out_of_order_packets,
+    elapsed_time,
+  };
+};
+
+export const createSummaryPage = (
+  doc: jsPDF,
+  current_statistics: Statistics,
+  port_tx_rx_mapping: { [name: number]: number },
+  currentLanguage: string
+) => {
+  const {
+    total_tx,
+    total_rx,
+    rtt,
+    iat_tx,
+    iat_rx,
+    lost_packets,
+    out_of_order_packets,
+  } = calculateStatistics(current_statistics, port_tx_rx_mapping);
+
+  // Packet statistics summary and RTT
+  const frameStatsRTTRows = formatFrameStatsRTTRows({
+    lost_packets,
+    total_rx,
+    out_of_order_packets,
+    iat_tx,
+    iat_rx,
+    rtt,
+    currentLanguage,
+  });
+
+  autoTable(
+    doc,
+    createAutoTableConfig(
+      doc,
+      frameStatsRTTCols,
+      frameStatsRTTRows,
+      {
+        0: { cellWidth: 40 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 30 },
+      },
+      [0, 1, 3, 4],
+      {
+        startY: 35,
+      },
+      true
+    )
+  );
+
+  // Frame and Ethernet Type Table
+  const frameEthernetRows = frameTypes.map((type) =>
+    frameEthernetRow(
+      current_statistics,
+      port_tx_rx_mapping,
+      type.label1 as string,
+      type.label2 as string,
+      total_tx,
+      total_rx
+    )
+  );
+
+  autoTable(
+    doc,
+    createAutoTableConfig(
+      doc,
+      frameEthernetCols,
+      frameEthernetRows,
+      {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 10 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 25 },
+      },
+      [0, 1, 2, 4, 5, 6]
+    )
+  );
+
+  // Frame Size Count Table
+  const frameSizeCountRows = [
+    ...frameSizes.map(([label, low, high]) =>
+      label !== "Total"
+        ? frameSizeCountRow(
+            current_statistics,
+            port_tx_rx_mapping,
+            label as string,
+            low as number,
+            high as number,
+            total_tx,
+            total_rx
+          )
+        : [
+            "Total",
+            formatFrameCount(total_tx),
+            "",
+            "",
+            "Total",
+            formatFrameCount(total_rx),
+            "",
+          ]
+    ),
+  ];
+
+  autoTable(
+    doc,
+    createAutoTableConfig(
+      doc,
+      frameSizeCountCols,
+      frameSizeCountRows,
+      {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 10 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 25 },
+      },
+      [0, 1, 2, 4, 5, 6]
+    )
+  );
+};
 
 const encapsulation: { [key: number]: string } = {
   0: "None",
@@ -277,6 +888,139 @@ export const createToC = (
   return doc;
 };
 
+export const createProfileToC = (
+  doc: jsPDF,
+  selectedRFC: number,
+  currentLanguage: string
+) => {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+
+  const startX = 15;
+  const buffer = 2;
+  const targetX = 180 - buffer;
+  let currentPage = selectedRFC === 0 ? 3 : 2;
+
+  console.log(currentPage);
+  let yPosition = 40;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const sections = [
+    { name: "Throughput", key: "throughput" },
+    { name: "Latency", key: "latency" },
+    { name: "Frame Loss Rate", key: "frame_loss_rate" },
+    { name: "Back-to-back Frames", key: "back_to_back" },
+    { name: "Reset", key: "reset" },
+  ];
+
+  let tocEntries: any = [
+    { title: "Test explanation", page: `Page ${currentPage}` },
+    { title: "Term explanation", page: `Page ${currentPage + 1}` },
+  ];
+
+  currentPage += 2; // Start after Test explanation and Term explanation pages
+
+  if (selectedRFC === 0) {
+    sections.forEach((section) => {
+      tocEntries.push({
+        title: section.name,
+        page: currentPage,
+      });
+      currentPage += 6; // 5 Summary pages + 1 Graph page
+    });
+  } else {
+    const section = sections[selectedRFC - 1];
+    tocEntries.push({
+      title: section.name,
+      page: currentPage,
+    });
+    currentPage += 6; // 5 Summary pages + 1 Graph page
+  }
+
+  tocEntries.forEach((entry: any, _: any) => {
+    if (yPosition > 270) {
+      yPosition = 40;
+      doc.addPage();
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.text(entry.title, startX, yPosition);
+    doc.setFont("helvetica", "normal");
+
+    if (
+      entry.title !== "Test explanation" &&
+      entry.title !== "Term explanation"
+    ) {
+      const subEntries = [
+        { name: "64 Bytes", page: `Page ${entry.page}` },
+        { name: "128 Bytes", page: `Page ${entry.page + 1}` },
+        { name: "512 Bytes", page: `Page ${entry.page + 2}` },
+        { name: "1024 Bytes", page: `Page ${entry.page + 3}` },
+        { name: "1518 Bytes", page: `Page ${entry.page + 4}` },
+        { name: "Test Graphs", page: `Page ${entry.page + 5}` },
+      ];
+
+      subEntries.forEach((subEntry) => {
+        yPosition += 7;
+        doc.text(subEntry.name, startX, yPosition);
+
+        const textWidth = doc.getTextWidth(subEntry.name);
+        const dots = addDots(doc, subEntry.name, targetX, startX, buffer);
+        doc.text(dots, startX + textWidth + buffer, yPosition);
+
+        doc.setFont("helvetica", "bold");
+        doc.text(subEntry.page, targetX + buffer, yPosition);
+        doc.setFont("helvetica", "normal");
+      });
+
+      yPosition += 15;
+    } else {
+      const textWidth = doc.getTextWidth(entry.title);
+      const dots = addDots(doc, entry.title, targetX, startX, buffer);
+      doc.text(dots, startX + textWidth + buffer, yPosition);
+
+      doc.setFont("helvetica", "bold");
+      doc.text(entry.page, targetX + buffer, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      yPosition += 10;
+    }
+  });
+
+  const totalPages = doc.getNumberOfPages();
+
+  for (let index = 1; index <= totalPages; index++) {
+    doc.setPage(index);
+
+    doc.setFontSize(17);
+    doc.setFont("helvetica", "bold");
+    doc.text("P4TG Network Report", pageWidth / 2, 15, { align: "center" });
+    doc.setFont("helvetica", "normal");
+
+    doc.setFontSize(12);
+    doc.text("Table of Contents", 105, 25, { align: "center" });
+
+    doc.setFontSize(8);
+    doc.text(
+      translate("Report was generated on:", currentLanguage) +
+        " " +
+        formatTime(),
+      5,
+      5,
+      {
+        align: "left",
+      }
+    );
+    doc.textWithLink("P4TG@Github", pageWidth / 2, pageHeight - 5, {
+      url: "https://github.com/uni-tue-kn/P4TG",
+      align: "center",
+    });
+  }
+
+  return doc;
+};
+
 const glossary = [
   [
     "CBR (Constant Bit Rate)",
@@ -386,60 +1130,12 @@ export const createTestExplanation = (
   doc.text(p4tgExplanation, startX, startY);
 
   if (test_mode === TestMode.PROFILE) {
-    const frame_size = traffic_gen_list[1].streams[0].frame_size ?? "N/A";
-
     doc.setFontSize(12);
     doc.text("RFC explanation", pageWidth / 2, 3 * startY - 10, {
       align: "center",
     });
     const rfcExplenation = doc.splitTextToSize(rfcExplanation, maxWidth);
     doc.text(rfcExplenation, startX, 3 * startY);
-
-    doc.text(
-      "Used frame sized for RFC2544: " + frame_size + " bytes",
-      pageWidth / 2,
-      5.3 * startY,
-      {
-        align: "center",
-      }
-    );
-    autoTable(doc, {
-      startY: 5.5 * startY,
-      head: [
-        [
-          "Test",
-          "Throughput",
-          "Latency",
-          "Frame-Loss",
-          "Back-To-Back Frames",
-          "Reset",
-        ],
-      ],
-      body: [
-        [
-          "Value",
-          rfc_results.throughput == null
-            ? "N/A"
-            : rfc_results.throughput.toFixed(3) + " Gbps",
-          rfc_results.latency == null
-            ? "N/A"
-            : rfc_results.latency.toFixed(3) + " Gbps",
-          rfc_results.frame_loss_rate == null
-            ? "N/A"
-            : rfc_results.frame_loss_rate.toFixed(3) + " Gbps",
-          rfc_results.back_to_back == null
-            ? "N/A"
-            : rfc_results.back_to_back.toFixed(3) + " Gbps",
-          rfc_results.reset == null
-            ? "N/A"
-            : rfc_results.reset.toFixed(3) + " Gbps",
-        ],
-      ],
-      theme: "plain",
-      styles: { fontSize: 10 },
-      margin: { left: startX },
-      columnStyles: {},
-    });
   }
 
   doc.setFontSize(17);

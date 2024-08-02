@@ -10,12 +10,14 @@ const Download = ({
   stats,
   traffic_gen_list,
   test_mode,
+  selectedRFC,
   graph_images,
 }: {
   data: TimeStatistics;
   stats: Statistics;
   traffic_gen_list: TrafficGenList;
   test_mode: TestMode;
+  selectedRFC: number;
   graph_images: {
     [key: number]: { Summary: string[]; [key: string]: string[] };
   };
@@ -26,6 +28,7 @@ const Download = ({
     stats,
     traffic_gen_list,
     test_mode,
+    selectedRFC,
     graph_images,
   };
 

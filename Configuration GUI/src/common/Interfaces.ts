@@ -305,11 +305,11 @@ export interface PreviousStatistics {
 }
 
 export interface RFCTestResults {
-  throughput: number | null;
-  latency: number | null;
-  frame_loss_rate: number | null;
-  back_to_back: number | null;
-  reset: number | null;
+  throughput: { [key: string]: number } | null;
+  latency: { [key: string]: number } | null;
+  frame_loss_rate: { [key: string]: number } | null;
+  back_to_back: { [key: string]: number } | null;
+  reset: { [key: string]: number } | null;
 }
 
 export interface Port {

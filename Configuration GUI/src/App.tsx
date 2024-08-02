@@ -37,6 +37,8 @@ import { StreamSettings } from "./common/Interfaces";
 import { Stream } from "./common/Interfaces";
 import { validateStreams, validateStreamSettings } from "./common/Validators";
 import ListSettings from "./components/ListSettings/ListSettings";
+import Test from "./components/Test";
+import Test2 from "./components/Test2";
 
 const App = () => {
   const [error, set_error] = useState(false);
@@ -135,6 +137,7 @@ const App = () => {
                       <Route path={"/tables"} element={<Tables />} />
                       <Route path={"/tests"} element={<ListSettings />} />
                       <Route path={"/settings"} element={<Settings />} />
+                      <Route path={"/woji"} element={<Test />} />
                     </Routes>
                   ) : (
                     <Offline />

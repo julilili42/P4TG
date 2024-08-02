@@ -4,14 +4,11 @@ import {
   Col,
   Form,
   Row,
-  Tab,
-  Tabs,
   OverlayTrigger,
   Tooltip,
 } from "react-bootstrap";
 import { del, get, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
-import StatView from "../components/StatView";
 import Loader from "../components/Loader";
 import {
   GenerationMode,
@@ -27,17 +24,12 @@ import {
   RFCTestSelection,
 } from "../common/Interfaces";
 import styled from "styled-components";
-import StreamView from "../components/StreamView";
 import translate from "../components/translation/Translate";
 import HiddenGraphs from "../components/pdf/HiddenVisuals";
 import Download from "../components/Download";
 
-import {
-  activePorts,
-  getStreamFrameSize,
-  getStreamIDsByPort,
-} from "../common/utils/StatisticUtils";
-import { getPortAndChannelFromPid } from "../common/utils/PdfUtils";
+import { activePorts } from "../common/utils/StatisticUtils";
+import { RenderTabs } from "../common/utils/HomeUtils";
 
 const StyledLink = styled.a`
   color: var(--color-secondary);
@@ -83,8 +75,8 @@ const Home = () => {
     };
   });
 
-  const [test_mode, setTestMode] = useState<number>(testSettings.mode);
-  const [selectedRFC, setSelectedRFC] = useState<number>(
+  const [test_mode, setTestMode] = useState<TestMode>(testSettings.mode);
+  const [selectedRFC, setSelectedRFC] = useState<RFCTestSelection>(
     testSettings.selectedRFC
   );
 
@@ -107,24 +99,13 @@ const Home = () => {
     trafficGen: null,
   });
 
-  /* 
-Könnte man zusammenfassen als test Number 
-const [testNumber, setTestNumber] = useState<>({currentTestNumber : 1, totalTestsNumber : 1, currentTestDuration : 0});
-
-interface TestNumberState {
-  currentTestNumber: number;
-  totalTestsNumber: number;
-  currentTestDuration: number;
-}
-
-
-   */
   const [currentTestNumber, setCurrentTestNumber] = useState<number>(1);
   const [totalTestsNumber, setTotalTestsNumber] = useState<number>(1);
   const [currentTestDuration, setCurrentTestDuration] = useState<number>(0);
   const [currentProfileTest, setCurrentProfileTest] = useState<string | null>(
     null
   );
+  const [profileData, setProfileData] = useState<any>(null);
 
   const [ports, set_ports] = useState<Port[]>([]);
 
@@ -149,7 +130,10 @@ interface TestNumberState {
       async () => await Promise.all([loadStatistics()]),
       500
     );
-    const info = setInterval(async () => await Promise.all([loadInfo()]), 500);
+    const interval_info = setInterval(
+      async () => await Promise.all([loadInfo()]),
+      500
+    );
     const interval_loadgen = setInterval(
       async () => await Promise.all([loadGen()]),
       5000
@@ -165,7 +149,7 @@ interface TestNumberState {
 
     return () => {
       clearInterval(interval_stats);
-      clearInterval(info);
+      clearInterval(interval_info);
       clearInterval(interval_loadgen);
       clearInterval(interval_default_loadgen);
       clearInterval(inverval_timestats);
@@ -365,6 +349,7 @@ interface TestNumberState {
         : "All tests completed or unknown test state.";
 
       setCurrentProfileTest(currentTest);
+      setProfileData(testResults);
     }
   };
 
@@ -473,43 +458,103 @@ interface TestNumberState {
   // Überlegen wie ich es mit den laden der Bilder im Profil Modus mache
   const shouldShowDownloadButton = (
     running: boolean,
-    statistics: TimeStatistics
+    statistics: TimeStatistics,
+    test_mode: TestMode,
+    selectedRFC: RFCTestSelection,
+    profileData: any
   ) => {
+    if (test_mode === TestMode.PROFILE && profileData) {
+      const profileKeys = [
+        "throughput",
+        "latency",
+        "frame_loss_rate",
+        "back_to_back",
+        "reset",
+      ];
+
+      if (selectedRFC === RFCTestSelection.ALL) {
+        const allTestsValid = profileKeys.every(
+          (key) => profileData[key] !== null
+        );
+        return allTestsValid && profileData.running === false;
+      } else {
+        const profileKey = profileKeys[selectedRFC - 1];
+        return (
+          profileData[profileKey] !== null && profileData.running === false
+        );
+      }
+    }
+
     return (
       !running &&
       Object.keys(statistics.tx_rate_l1).length > 0 &&
-      currentTestNumber === totalTestsNumber /* &&
-      test_mode !== TestMode.PROFILE */
+      currentTestNumber === totalTestsNumber
     );
   };
 
   const handleGraphConvert = (newImageData: string[]) => {
-    const newImageMap: {
-      [key: number]: { Summary: string[]; [key: string]: string[] };
-    } = {};
+    if (test_mode === TestMode.PROFILE) {
+      const profileData = [
+        "throughput",
+        "packet_loss",
+        "latency",
+        "frame_loss_rate",
+        "back_to_back",
+        "reset",
+      ];
 
-    let currentIndex = 0;
-
-    Object.keys(traffic_gen_list).forEach((testId) => {
-      const portMapping = traffic_gen_list[testId as any].port_tx_rx_mapping;
-      const portPairs = activePorts(portMapping);
-
-      newImageMap[Number(testId)] = {
-        Summary: newImageData.slice(currentIndex, currentIndex + 6),
+      const profileImageMap: {
+        [key: number]: { Summary: string[]; [key: string]: string[] };
+      } = {
+        1: { Summary: [""] },
       };
-      currentIndex += 6;
 
-      portPairs.forEach((pair, index) => {
-        const portPairKey = `${pair.tx}`;
-        newImageMap[Number(testId)][portPairKey] = newImageData.slice(
-          currentIndex,
-          currentIndex + 6
-        );
+      if (selectedRFC === RFCTestSelection.ALL) {
+        profileData.forEach((key, index) => {
+          profileImageMap[1][key] = [newImageData[index]];
+        });
+      } else if (selectedRFC === RFCTestSelection.THROUGHPUT) {
+        profileImageMap[1]["throughput"] = [newImageData[0]];
+        profileImageMap[1]["packet_loss"] = [newImageData[1]];
+      } else if (selectedRFC === RFCTestSelection.LATENCY) {
+        profileImageMap[1]["latency"] = [newImageData[0]];
+      } else if (selectedRFC === RFCTestSelection.FRAME_LOSS_RATE) {
+        profileImageMap[1]["frame_loss_rate"] = [newImageData[0]];
+      } else if (selectedRFC === RFCTestSelection.BACK_TO_BACK) {
+        profileImageMap[1]["back_to_back"] = [newImageData[0]];
+      } else if (selectedRFC === RFCTestSelection.RESET) {
+        profileImageMap[1]["reset"] = [newImageData[0]];
+      }
+
+      setImageData(profileImageMap);
+    } else {
+      const newImageMap: {
+        [key: number]: { Summary: string[]; [key: string]: string[] };
+      } = {};
+
+      let currentIndex = 0;
+
+      Object.keys(traffic_gen_list).forEach((testId) => {
+        const portMapping = traffic_gen_list[testId as any].port_tx_rx_mapping;
+        const portPairs = activePorts(portMapping);
+
+        newImageMap[Number(testId)] = {
+          Summary: newImageData.slice(currentIndex, currentIndex + 6),
+        };
         currentIndex += 6;
-      });
-    });
 
-    setImageData(newImageMap);
+        portPairs.forEach((pair, index) => {
+          const portPairKey = `${pair.tx}`;
+          newImageMap[Number(testId)][portPairKey] = newImageData.slice(
+            currentIndex,
+            currentIndex + 6
+          );
+          currentIndex += 6;
+        });
+      });
+
+      setImageData(newImageMap);
+    }
   };
 
   const handleSelectTest = (testNumber: number) => {
@@ -532,7 +577,6 @@ interface TestNumberState {
       <form onSubmit={onSubmit}>
         <Row className={"mb-3"}>
           <SendReceiveMonitor stats={statistics} running={running} />
-          {/* Ich sollte hier weitere bedingungen (siehe pdf button) hinzufügen damit zwicshen den Tests das nicht angezegit wird */}
           <Col className={"text-end col-4"}>
             {running ? (
               <>
@@ -562,12 +606,20 @@ interface TestNumberState {
                       {translate("Reset", currentLanguage)}{" "}
                     </Button>{" "}
                   </div>
-                  {shouldShowDownloadButton(running, time_statistics) && (
+                  {shouldShowDownloadButton(
+                    running,
+                    time_statistics,
+                    test_mode,
+                    selectedRFC,
+                    profileData
+                  ) && (
                     <>
                       <HiddenGraphs
                         data={time_statistics}
                         stats={statistics}
                         traffic_gen_list={traffic_gen_list}
+                        testMode={test_mode}
+                        selectedRFC={selectedRFC}
                         onConvert={handleGraphConvert}
                       />
                       <Download
@@ -575,6 +627,7 @@ interface TestNumberState {
                         stats={statistics}
                         traffic_gen_list={traffic_gen_list}
                         test_mode={test_mode}
+                        selectedRFC={selectedRFC}
                         graph_images={imageData}
                       />
                     </>
@@ -632,190 +685,19 @@ interface TestNumberState {
           </Col>
         )}
       </Row>
-      <Tabs
-        defaultActiveKey="current"
-        className="mt-3"
-        onSelect={(eventKey) => handleSelectTest(Number(eventKey))}
-      >
-        <Tab
-          eventKey="current"
-          title={translate("Current Test", currentLanguage)}
-        >
-          <Tabs defaultActiveKey="Summary" className="mt-3">
-            <Tab
-              eventKey="Summary"
-              title={translate("Summary", currentLanguage)}
-            >
-              <StatView
-                stats={statistics}
-                time_stats={time_statistics}
-                port_mapping={
-                  traffic_gen_list[currentTestNumber]?.port_tx_rx_mapping || {}
-                }
-                visual={visual}
-                mode={traffic_gen_list[currentTestNumber]?.mode || 0}
-              />
-            </Tab>
-            {activePorts(
-              traffic_gen_list[currentTestNumber]?.port_tx_rx_mapping || {}
-            ).map((v, i) => {
-              let mapping: { [name: number]: number } = { [v.tx]: v.rx };
-              return (
-                <Tab
-                  eventKey={i}
-                  key={i}
-                  title={
-                    v.tx +
-                    ` (${getPortAndChannelFromPid(v.tx, ports).port}) ` +
-                    "-> " +
-                    v.rx +
-                    ` (${getPortAndChannelFromPid(v.rx, ports).port}) `
-                  }
-                >
-                  <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
-                    <Tab eventKey={"Overview"} title={"Overview"}>
-                      <StatView
-                        stats={statistics}
-                        time_stats={time_statistics}
-                        port_mapping={mapping}
-                        mode={traffic_gen_list[currentTestNumber]?.mode || 0}
-                        visual={visual}
-                      />
-                    </Tab>
-                    {Object.keys(mapping)
-                      .map(Number)
-                      .map((v) => {
-                        let stream_ids = getStreamIDsByPort(
-                          v,
-                          traffic_gen_list[currentTestNumber]
-                            ?.stream_settings || [],
-                          traffic_gen_list[currentTestNumber]?.streams || []
-                        );
-                        return stream_ids.map((stream: number, i) => {
-                          let stream_frame_size: any = getStreamFrameSize(
-                            traffic_gen_list[currentTestNumber]?.streams || [],
-                            stream
-                          );
-                          return (
-                            <Tab
-                              key={i}
-                              eventKey={stream}
-                              title={"Stream " + stream}
-                            >
-                              <StreamView
-                                stats={statistics}
-                                port_mapping={mapping}
-                                stream_id={stream}
-                                frame_size={stream_frame_size}
-                              />
-                            </Tab>
-                          );
-                        });
-                      })}
-                  </Tabs>
-                </Tab>
-              );
-            })}
-          </Tabs>
-        </Tab>
-
-        {Object.keys(statistics.previous_statistics || {}).map((key) => {
-          const testTitle = traffic_gen_list[key as any]?.name || `Test ${key}`;
-          return (
-            <Tab key={Number(key)} eventKey={Number(key)} title={testTitle}>
-              <Tabs defaultActiveKey="Summary" className="mt-3">
-                <Tab
-                  eventKey="Summary"
-                  title={translate("Summary", currentLanguage)}
-                >
-                  {selectedTest.statistics && selectedTest.timeStatistics && (
-                    <>
-                      <StatView
-                        stats={selectedTest.statistics}
-                        time_stats={selectedTest.timeStatistics}
-                        port_mapping={
-                          selectedTest.trafficGen?.port_tx_rx_mapping || {}
-                        }
-                        mode={selectedTest.trafficGen?.mode || 0}
-                        visual={visual}
-                      />
-                    </>
-                  )}
-                </Tab>
-                {activePorts(
-                  selectedTest.trafficGen?.port_tx_rx_mapping || {}
-                ).map((v, i) => {
-                  let mapping: { [name: number]: number } = { [v.tx]: v.rx };
-                  return (
-                    <Tab
-                      eventKey={i}
-                      key={i}
-                      title={
-                        v.tx +
-                        ` (${getPortAndChannelFromPid(v.tx, ports).port}) ` +
-                        "-> " +
-                        v.rx +
-                        ` (${getPortAndChannelFromPid(v.rx, ports).port}) `
-                      }
-                    >
-                      <Tabs defaultActiveKey={"Overview"} className={"mt-3"}>
-                        <Tab eventKey={"Overview"} title={"Overview"}>
-                          {selectedTest.statistics &&
-                            selectedTest.timeStatistics && (
-                              <>
-                                <StatView
-                                  stats={selectedTest.statistics}
-                                  time_stats={selectedTest.timeStatistics}
-                                  port_mapping={mapping}
-                                  mode={selectedTest.trafficGen?.mode || 0}
-                                  visual={visual}
-                                />
-                              </>
-                            )}
-                        </Tab>
-                        {Object.keys(mapping)
-                          .map(Number)
-                          .map((v) => {
-                            let stream_ids = getStreamIDsByPort(
-                              v,
-                              selectedTest.trafficGen?.stream_settings || [],
-                              selectedTest.trafficGen?.streams || []
-                            );
-                            return stream_ids.map((stream: number, i) => {
-                              let stream_frame_size = getStreamFrameSize(
-                                selectedTest.trafficGen?.streams || [],
-                                stream
-                              );
-                              return (
-                                <Tab
-                                  key={i}
-                                  eventKey={stream}
-                                  title={"Stream " + stream}
-                                >
-                                  {selectedTest.statistics &&
-                                    selectedTest.timeStatistics && (
-                                      <>
-                                        <StreamView
-                                          stats={selectedTest.statistics}
-                                          port_mapping={mapping}
-                                          stream_id={stream}
-                                          frame_size={stream_frame_size}
-                                        />
-                                      </>
-                                    )}
-                                </Tab>
-                              );
-                            });
-                          })}
-                      </Tabs>
-                    </Tab>
-                  );
-                })}
-              </Tabs>
-            </Tab>
-          );
-        })}
-      </Tabs>
+      <RenderTabs
+        test_mode={test_mode}
+        selectedRFC={selectedRFC}
+        statistics={statistics}
+        time_statistics={time_statistics}
+        traffic_gen_list={traffic_gen_list}
+        currentTestNumber={currentTestNumber}
+        visual={visual}
+        currentLanguage={currentLanguage}
+        ports={ports}
+        handleSelectTest={handleSelectTest}
+        selectedTest={selectedTest}
+      />
       <GitHub />
     </Loader>
   );

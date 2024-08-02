@@ -25,6 +25,12 @@ pub async fn get_test_results(State(state): State<Arc<AppState>>) -> impl IntoRe
 }
 /// Method called on POST /profiles
 pub async fn run_tests(State(state): State<Arc<AppState>>, Json(request): Json<TestRequest>) -> Response {
+    
+    // Check if exactly one stream is defined
+    if request.payload.streams.len() != 1 {
+        return (StatusCode::BAD_REQUEST, Json("RFC 2544 Test can only process one stream")).into_response();
+    }
+
     // Reset results before starting tests
     reset_results(Arc::clone(&state)).await;
 
@@ -75,13 +81,13 @@ async fn run_all_tests_inner(state: Arc<AppState>, payload: TrafficGenData) -> R
     if run_test(Arc::clone(&state), payload.clone(), throughput_test, "Throughput").await.is_err() {
         return Err(());
     }
+    if run_test(Arc::clone(&state), payload.clone(), back_to_back_test, "Back-to-back frames").await.is_err() {
+        return Err(());
+    }
     if run_test(Arc::clone(&state), payload.clone(), latency_test, "Latency").await.is_err() {
         return Err(());
     }
     if run_test(Arc::clone(&state), payload.clone(), frame_loss_rate_test, "Frame Loss Rate").await.is_err() {
-        return Err(());
-    }
-    if run_test(Arc::clone(&state), payload.clone(), back_to_back_test, "Back-to-back frames").await.is_err() {
         return Err(());
     }
     if run_test(Arc::clone(&state), payload, reset_test, "Reset").await.is_err() {
