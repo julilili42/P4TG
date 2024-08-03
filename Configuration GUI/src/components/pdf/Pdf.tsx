@@ -91,12 +91,11 @@ const DownloadPdf = ({
         results,
         selectedRFC,
         graph_images[1],
-        ports,
         currentLanguage
       );
 
       const tocProfileDoc = new jsPDF("p", "mm", [297, 210]);
-      createProfileToC(tocProfileDoc, selectedRFC, currentLanguage);
+      createProfileToC(tocProfileDoc, selectedRFC, results, currentLanguage);
       const tocProfileBuffer = tocProfileDoc.output("arraybuffer");
 
       const expDoc = new jsPDF("p", "mm", [297, 210]);

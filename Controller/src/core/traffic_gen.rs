@@ -394,7 +394,7 @@ impl TrafficGen {
     /// # Arguments
     ///
     /// * `packets`: List of packets that should be generated. Index is the application id.
-    pub async fn activate_traffic_gen_applications(&self, switch: &SwitchConnection, packets: &HashMap<u8, StreamPacket>) -> Result<(), RBFRTError> {
+    pub async fn activate_traffic_gen_applications(&self, switch: &SwitchConnection, packets: &HashMap<u8, StreamPacket>) -> Result<(), RBFRTError> {        
         let update_requests: Vec<Request> = packets.iter().map(|(_, packet)| table::Request::new(APP_CFG)
             .match_key("app_id", MatchValue::exact(packet.app_id))
             .action("trigger_timer_periodic")
@@ -403,7 +403,13 @@ impl TrafficGen {
             .action_data("timer_nanosec", packet.timer)
             .action_data("packets_per_batch_cfg", packet.n_packets - 1)
             .action_data("pipe_local_source_port", TG_PIPE_PORTS[0]) // traffic gen port
-            .action_data("pkt_buffer_offset", packet.buffer_offset.unwrap())).collect();
+            .action_data("pkt_buffer_offset", packet.buffer_offset.unwrap())        
+        ).collect();
+
+        if let Some((_, packet)) = packets.iter().next() {
+        info!("packets_per_batch_cfg: {}", packet.n_packets - 1);
+        }
+
         switch.update_table_entries(update_requests).await?;
 
         Ok(())
@@ -470,6 +476,9 @@ impl TrafficGen {
 
             // call solver
             let (n_packets, timeout) = calculate_send_behaviour(s.frame_size + encapsulation_overhead, s.traffic_rate, s.burst);
+            info!("n_packets: {}", n_packets);
+
+
             let rate = ((n_packets as u32) * (s.frame_size + encapsulation_overhead) * 8) as f64 / timeout as f64;
             let rate_accuracy = 100f32 * (1f32 - ((s.traffic_rate - (rate as f32)).abs() / s.traffic_rate));
 

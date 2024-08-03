@@ -243,7 +243,6 @@ const Profile = ({ ports }: { ports: Port[] }) => {
             <option value={RFCTestSelection.THROUGHPUT}>Throughput</option>
             <option value={RFCTestSelection.LATENCY}>Latency</option>
             <option value={RFCTestSelection.FRAME_LOSS_RATE}>Frame-Loss</option>
-            <option value={RFCTestSelection.BACK_TO_BACK}>Back-To-Back</option>
             <option value={RFCTestSelection.RESET}>Reset</option>
           </Form.Select>
         </Col>

@@ -204,19 +204,25 @@ export const createPdf = (
 export const createRfcTable = (
   doc: jsPDF,
   test: any,
-  graphType:
-    | "throughput"
-    | "latency"
-    | "frame_loss_rate"
-    | "back_to_back"
-    | "reset",
+  graphType: "throughput" | "latency" | "frame_loss_rate" | "reset",
   yOffset: number
 ) => {
   const frameSizes = ["64", "128", "512", "1024", "1518"];
 
-  const headers = ["Frame Size", ...frameSizes.map((size) => `${size} Bytes`)];
+  const headers =
+    graphType === "reset"
+      ? ["Frame Size", "64 Bytes"]
+      : ["Frame Size", ...frameSizes.map((size) => `${size} Bytes`)];
 
   const createRow = (testType: string, data: any, unit: string) => {
+    if (graphType === "reset") {
+      return [
+        testType,
+        data && data["64"] !== undefined
+          ? `${Number(data["64"]).toFixed(3)}${unit}`
+          : "Not running",
+      ];
+    }
     return [
       testType,
       ...frameSizes.map((size) => {
@@ -234,11 +240,6 @@ export const createRfcTable = (
       label: "Frame Loss Rate",
       data: test.frame_loss_rate,
       unit: " Gbps",
-    },
-    back_to_back: {
-      label: "Back to Back",
-      data: test.back_to_back,
-      unit: " Frames",
     },
     reset: { label: "Reset", data: test.reset, unit: " Seconds" },
   };
@@ -309,12 +310,7 @@ const addGraphsAndTables = (
   doc: jsPDF,
   graph_images: { Summary: string[]; [key: string]: string[] },
   rfc_results: RFCTestResults,
-  graphType:
-    | "throughput"
-    | "latency"
-    | "frame_loss_rate"
-    | "back_to_back"
-    | "reset"
+  graphType: "throughput" | "latency" | "frame_loss_rate" | "reset"
 ) => {
   const pageWidth = doc.internal.pageSize.getWidth();
   const getDisplayName = (test_name: string) => {
@@ -325,8 +321,6 @@ const addGraphsAndTables = (
         return "Latency";
       case "frame_loss_rate":
         return "Frame Loss Rate";
-      case "back_to_back":
-        return "Back to Back";
       case "reset":
         return "Reset";
       default:
@@ -349,6 +343,8 @@ const addGraphsAndTables = (
   doc.text("Test Graph", pageWidth / 2, 25, { align: "center" });
 
   let yOffset = 35;
+
+  console.log(graph_images);
 
   if (graph_images[graphType]) {
     graph_images[graphType].forEach((imageData) => {
@@ -374,7 +370,6 @@ export const createProfilePdf = (
   rfc_results: RFCTestResults,
   selectedRFC: number,
   graph_images: { Summary: string[]; [key: string]: string[] },
-  ports: Port[],
   currentLanguage: string
 ) => {
   const doc = new jsPDF("p", "mm", [297, 210]);
@@ -383,35 +378,18 @@ export const createProfilePdf = (
   const pageSize = 5;
   const totalTests = Object.keys(testList).length;
 
-  // Determine graph array based on selectedRFC
-  let graphArray: (
-    | "throughput"
-    | "latency"
-    | "frame_loss_rate"
-    | "back_to_back"
-    | "reset"
-  )[];
-  if (selectedRFC === 0) {
-    graphArray = [
-      "throughput",
-      "latency",
-      "frame_loss_rate",
-      "back_to_back",
-      "reset",
-    ];
-  } else if (selectedRFC === 1) {
-    graphArray = ["throughput"];
-  } else if (selectedRFC === 2) {
-    graphArray = ["latency"];
-  } else if (selectedRFC === 3) {
-    graphArray = ["frame_loss_rate"];
-  } else if (selectedRFC === 4) {
-    graphArray = ["back_to_back"];
-  } else if (selectedRFC === 5) {
-    graphArray = ["reset"];
-  } else {
-    graphArray = []; // Default to an empty array if selectedRFC is not 0, 1, 2, 3, 4, or 5
-  }
+  // Mapping selectedRFC to graph array
+  const rfcGraphMap: {
+    [key: number]: ("throughput" | "latency" | "frame_loss_rate" | "reset")[];
+  } = {
+    0: ["throughput", "latency", "frame_loss_rate", "reset"],
+    1: ["throughput"],
+    2: ["latency"],
+    3: ["frame_loss_rate"],
+    4: ["reset"],
+  };
+
+  const graphArray = rfcGraphMap[selectedRFC] || [];
 
   for (let i = 0; i < totalTests; i += pageSize) {
     // Create summary pages for current batch
@@ -891,6 +869,7 @@ export const createToC = (
 export const createProfileToC = (
   doc: jsPDF,
   selectedRFC: number,
+  results: RFCTestResults,
   currentLanguage: string
 ) => {
   doc.setFont("helvetica", "normal");
@@ -901,41 +880,64 @@ export const createProfileToC = (
   const targetX = 180 - buffer;
   let currentPage = selectedRFC === 0 ? 3 : 2;
 
-  console.log(currentPage);
   let yPosition = 40;
   const pageHeight = doc.internal.pageSize.getHeight();
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  const sections = [
-    { name: "Throughput", key: "throughput" },
-    { name: "Latency", key: "latency" },
-    { name: "Frame Loss Rate", key: "frame_loss_rate" },
-    { name: "Back-to-back Frames", key: "back_to_back" },
-    { name: "Reset", key: "reset" },
-  ];
+  const sections = Object.entries(results)
+    .filter(([_, result]) => result !== null)
+    .map(([key]) => {
+      switch (key) {
+        case "throughput":
+          return { name: "Throughput", key };
+        case "latency":
+          return { name: "Latency", key };
+        case "frame_loss_rate":
+          return { name: "Frame Loss Rate", key };
+        case "reset":
+          return { name: "Reset", key };
+        default:
+          return null;
+      }
+    })
+    .filter((section) => section !== null);
 
   let tocEntries: any = [
-    { title: "Test explanation", page: `Page ${currentPage}` },
-    { title: "Term explanation", page: `Page ${currentPage + 1}` },
+    { title: "Test explanation", page: `Page ${currentPage - 1}` },
+    { title: "Term explanation", page: `Page ${currentPage}` },
   ];
 
-  currentPage += 2; // Start after Test explanation and Term explanation pages
-
-  if (selectedRFC === 0) {
-    sections.forEach((section) => {
-      tocEntries.push({
-        title: section.name,
-        page: currentPage,
-      });
-      currentPage += 6; // 5 Summary pages + 1 Graph page
-    });
-  } else {
-    const section = sections[selectedRFC - 1];
+  const addSectionEntries = (section: any) => {
     tocEntries.push({
       title: section.name,
-      page: currentPage,
+      page: `Page ${currentPage}`,
     });
-    currentPage += 6; // 5 Summary pages + 1 Graph page
+    currentPage += 1;
+
+    if (results[section.key as keyof RFCTestResults] !== null) {
+      const frames = Object.keys(
+        results[section.key as keyof RFCTestResults] as any
+      );
+      frames.forEach((frameSize, index) => {
+        tocEntries.push({
+          title: `${frameSize} Bytes`,
+          page: `Page ${currentPage + index}`,
+        });
+      });
+      currentPage += frames.length;
+      tocEntries.push({
+        title: "Test Graphs",
+        page: `Page ${currentPage}`,
+      });
+      currentPage += 1; // 1 Graph page
+    }
+  };
+
+  if (selectedRFC === 0) {
+    sections.forEach(addSectionEntries);
+  } else {
+    const section = sections[selectedRFC - 1];
+    addSectionEntries(section);
   }
 
   tocEntries.forEach((entry: any, _: any) => {
@@ -944,47 +946,23 @@ export const createProfileToC = (
       doc.addPage();
     }
 
-    doc.setFont("helvetica", "bold");
+    const isBold =
+      entry.title !== "Test Graphs" && !entry.title.includes("Bytes");
+    doc.setFont("helvetica", isBold ? "bold" : "normal");
     doc.text(entry.title, startX, yPosition);
+
+    const textWidth = doc.getTextWidth(entry.title);
+    doc.setFont("helvetica", "normal");
+    const dots = addDots(doc, entry.title, targetX, startX, buffer);
+    doc.text(dots, startX + textWidth + buffer, yPosition);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(String(entry.page), targetX + buffer, yPosition);
     doc.setFont("helvetica", "normal");
 
-    if (
-      entry.title !== "Test explanation" &&
-      entry.title !== "Term explanation"
-    ) {
-      const subEntries = [
-        { name: "64 Bytes", page: `Page ${entry.page}` },
-        { name: "128 Bytes", page: `Page ${entry.page + 1}` },
-        { name: "512 Bytes", page: `Page ${entry.page + 2}` },
-        { name: "1024 Bytes", page: `Page ${entry.page + 3}` },
-        { name: "1518 Bytes", page: `Page ${entry.page + 4}` },
-        { name: "Test Graphs", page: `Page ${entry.page + 5}` },
-      ];
-
-      subEntries.forEach((subEntry) => {
-        yPosition += 7;
-        doc.text(subEntry.name, startX, yPosition);
-
-        const textWidth = doc.getTextWidth(subEntry.name);
-        const dots = addDots(doc, subEntry.name, targetX, startX, buffer);
-        doc.text(dots, startX + textWidth + buffer, yPosition);
-
-        doc.setFont("helvetica", "bold");
-        doc.text(subEntry.page, targetX + buffer, yPosition);
-        doc.setFont("helvetica", "normal");
-      });
-
-      yPosition += 15;
-    } else {
-      const textWidth = doc.getTextWidth(entry.title);
-      const dots = addDots(doc, entry.title, targetX, startX, buffer);
-      doc.text(dots, startX + textWidth + buffer, yPosition);
-
-      doc.setFont("helvetica", "bold");
-      doc.text(entry.page, targetX + buffer, yPosition);
-      doc.setFont("helvetica", "normal");
-
-      yPosition += 10;
+    yPosition += entry.title.includes("Bytes") ? 6 : 8; // Adjusted spacing
+    if (entry.title.includes("Bytes")) {
+      yPosition += 2; // Add extra space after each frame size
     }
   });
 
@@ -1003,9 +981,10 @@ export const createProfileToC = (
 
     doc.setFontSize(8);
     doc.text(
-      translate("Report was generated on:", currentLanguage) +
-        " " +
-        formatTime(),
+      `${translate(
+        "Report was generated on:",
+        currentLanguage
+      )} ${formatTime()}`,
       5,
       5,
       {

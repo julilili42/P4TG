@@ -1,7 +1,7 @@
 use crate::core::traffic_gen_core::types::*;
 use crate::api::multiple_traffic_gen::abort_current_test;
 use crate::api::traffic_gen::stop_traffic_gen;
-use crate::api::rfc_tests::{throughput_test, latency_test, frame_loss_rate_test, back_to_back_test, reset_test, reset_results, reset_collected_statistics, handle_test_result, set_running_flag, set_name_flag};
+use crate::api::rfc_tests::{throughput_test, latency_test, frame_loss_rate_test, reset_test, reset_results, reset_collected_statistics, handle_test_result, set_running_flag, set_name_flag};
 use crate::AppState;
 
 
@@ -81,9 +81,6 @@ async fn run_all_tests_inner(state: Arc<AppState>, payload: TrafficGenData) -> R
     if run_test(Arc::clone(&state), payload.clone(), throughput_test, "Throughput").await.is_err() {
         return Err(());
     }
-    if run_test(Arc::clone(&state), payload.clone(), back_to_back_test, "Back-to-back frames").await.is_err() {
-        return Err(());
-    }
     if run_test(Arc::clone(&state), payload.clone(), latency_test, "Latency").await.is_err() {
         return Err(());
     }
@@ -106,8 +103,7 @@ async fn run_single_test(state: Arc<AppState>, test_id: u8, payload: TrafficGenD
         1 => run_test(Arc::clone(&state), payload, throughput_test, "Throughput").await,
         2 => run_test(Arc::clone(&state), payload, latency_test, "Latency").await,
         3 => run_test(Arc::clone(&state), payload, frame_loss_rate_test, "Frame Loss Rate").await,
-        4 => run_test(Arc::clone(&state), payload, back_to_back_test, "Back-to-back").await,
-        5 => run_test(Arc::clone(&state), payload, reset_test, "Reset").await,
+        4 => run_test(Arc::clone(&state), payload, reset_test, "Reset").await,
         _ => Err(()),
     };
 

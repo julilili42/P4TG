@@ -184,8 +184,7 @@ export enum RFCTestSelection {
   THROUGHPUT = 1,
   LATENCY = 2,
   FRAME_LOSS_RATE = 3,
-  BACK_TO_BACK = 4,
-  RESET = 5,
+  RESET = 4,
 }
 
 export interface Stream {
@@ -319,3 +318,5 @@ export interface Port {
   loopback: string;
   status: boolean;
 }
+
+export type ChartRef = React.RefObject<HTMLDivElement>;

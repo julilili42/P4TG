@@ -18,7 +18,7 @@
  */
 
 use highs::{HighsModelStatus, Sense};
-use log::warn;
+use log::{info, warn};
 use crate::core::traffic_gen_core::const_definitions::SOLVER_TIME_LIMIT_IN_SECONDS;
 
 /// Calculates the number of packets (n) that should be sent per timeout ns limited by `max_burst`.
@@ -40,6 +40,8 @@ pub fn calculate_send_behaviour(frame_size: u32, traffic_rate: f32, max_burst: u
     let d = (real_iat - real_iat.floor()) / real_iat;
 
     let max_packets = if max_burst == 1 { 1 } else { (( d / accuracy) as u32) + 1};
+
+    info!("max_packets: {}", max_packets);
 
     // calc + num packets for objective
     let calculation = problem.add_column(1., 0..100);

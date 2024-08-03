@@ -5,6 +5,7 @@ import {
   TimeStatistics,
   TrafficGenList,
   TestMode,
+  ChartRef,
 } from "../../common/Interfaces";
 
 import { activePorts } from "../../common/utils/StatisticUtils";
@@ -20,9 +21,7 @@ import {
   get_rtt_options,
   get_frame_options,
 } from "../../common/utils/VisualUtils";
-import BarChart from "../Test2";
-
-type ChartRef = React.RefObject<HTMLDivElement>;
+import BarChart from "./Charts/BarCharts";
 
 const createRefArray = (length: number): ChartRef[] => {
   return Array.from({ length }, () => React.createRef<HTMLDivElement>());
@@ -62,15 +61,9 @@ const HiddenGraphs = ({
   );
 
   const [isChartRendered, setIsChartRendered] = useState(false);
-  const barChartRefs: [
-    ChartRef,
-    ChartRef,
-    ChartRef,
-    ChartRef,
-    ChartRef,
-    ChartRef
-  ] = [
-    useRef(null),
+
+  // Throughput, Packet Loss, Latency, Frame Loss, Reset
+  const barChartRefs: [ChartRef, ChartRef, ChartRef, ChartRef, ChartRef] = [
     useRef(null),
     useRef(null),
     useRef(null),

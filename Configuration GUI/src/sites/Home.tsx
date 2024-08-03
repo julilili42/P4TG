@@ -6,6 +6,7 @@ import {
   Row,
   OverlayTrigger,
   Tooltip,
+  Alert,
 } from "react-bootstrap";
 import { del, get, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
@@ -28,8 +29,11 @@ import translate from "../components/translation/Translate";
 import HiddenGraphs from "../components/pdf/HiddenVisuals";
 import Download from "../components/Download";
 
-import { activePorts } from "../common/utils/StatisticUtils";
-import { RenderTabs } from "../common/utils/HomeUtils";
+import {
+  RenderTabs,
+  convertProfileData,
+  convertTestData,
+} from "../common/utils/HomeUtils";
 
 const StyledLink = styled.a`
   color: var(--color-secondary);
@@ -47,7 +51,7 @@ export const GitHub = () => {
     <Row className="mt-2">
       <Col className="text-center col-12 mt-3">
         <StyledLink href="https://github.com/uni-tue-kn/P4TG" target="_blank">
-          P4TG @ <i className="bi bi-github"></i>
+          P4TG @ <i className="bi bi-github" style={{ color: "white" }}></i>
         </StyledLink>
       </Col>
     </Row>
@@ -494,66 +498,9 @@ const Home = () => {
 
   const handleGraphConvert = (newImageData: string[]) => {
     if (test_mode === TestMode.PROFILE) {
-      const profileData = [
-        "throughput",
-        "packet_loss",
-        "latency",
-        "frame_loss_rate",
-        "back_to_back",
-        "reset",
-      ];
-
-      const profileImageMap: {
-        [key: number]: { Summary: string[]; [key: string]: string[] };
-      } = {
-        1: { Summary: [""] },
-      };
-
-      if (selectedRFC === RFCTestSelection.ALL) {
-        profileData.forEach((key, index) => {
-          profileImageMap[1][key] = [newImageData[index]];
-        });
-      } else if (selectedRFC === RFCTestSelection.THROUGHPUT) {
-        profileImageMap[1]["throughput"] = [newImageData[0]];
-        profileImageMap[1]["packet_loss"] = [newImageData[1]];
-      } else if (selectedRFC === RFCTestSelection.LATENCY) {
-        profileImageMap[1]["latency"] = [newImageData[0]];
-      } else if (selectedRFC === RFCTestSelection.FRAME_LOSS_RATE) {
-        profileImageMap[1]["frame_loss_rate"] = [newImageData[0]];
-      } else if (selectedRFC === RFCTestSelection.BACK_TO_BACK) {
-        profileImageMap[1]["back_to_back"] = [newImageData[0]];
-      } else if (selectedRFC === RFCTestSelection.RESET) {
-        profileImageMap[1]["reset"] = [newImageData[0]];
-      }
-
-      setImageData(profileImageMap);
+      setImageData(convertProfileData(newImageData, selectedRFC));
     } else {
-      const newImageMap: {
-        [key: number]: { Summary: string[]; [key: string]: string[] };
-      } = {};
-
-      let currentIndex = 0;
-
-      Object.keys(traffic_gen_list).forEach((testId) => {
-        const portMapping = traffic_gen_list[testId as any].port_tx_rx_mapping;
-        const portPairs = activePorts(portMapping);
-
-        newImageMap[Number(testId)] = {
-          Summary: newImageData.slice(currentIndex, currentIndex + 6),
-        };
-        currentIndex += 6;
-
-        portPairs.forEach((pair, index) => {
-          const portPairKey = `${pair.tx}`;
-          newImageMap[Number(testId)][portPairKey] = newImageData.slice(
-            currentIndex,
-            currentIndex + 6
-          );
-          currentIndex += 6;
-        });
-      });
-
-      setImageData(newImageMap);
+      setImageData(convertTestData(newImageData, traffic_gen_list));
     }
   };
 
@@ -576,6 +523,15 @@ const Home = () => {
     <Loader loaded={loaded} overlay={overlay}>
       <form onSubmit={onSubmit}>
         <Row className={"mb-3"}>
+          {running &&
+            test_mode === TestMode.PROFILE &&
+            selectedRFC === RFCTestSelection.RESET && (
+              <Col className="col-12">
+                <Alert variant={"primary"}>
+                  Cause a Reset in the DUT in the next 120 Seconds
+                </Alert>
+              </Col>
+            )}
           <SendReceiveMonitor stats={statistics} running={running} />
           <Col className={"text-end col-4"}>
             {running ? (

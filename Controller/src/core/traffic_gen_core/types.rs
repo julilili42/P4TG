@@ -263,7 +263,6 @@ pub struct TestResult {
     pub(crate) throughput: Option<BTreeMap<u32, f32>>,
     pub(crate) latency: Option<BTreeMap<u32, f64>>,
     pub(crate) frame_loss_rate: Option<BTreeMap<u32, f32>>,
-    pub(crate) back_to_back: Option<BTreeMap<u32, u16>>,
     pub(crate) reset: Option<BTreeMap<u32, f64>>,
     pub(crate) running: bool, 
     pub(crate) current_test: Option<String>,
