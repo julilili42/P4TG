@@ -24,7 +24,10 @@ import {
   Row,
 } from "react-bootstrap";
 import InfoBox from "../InfoBox";
-import { ResultTable, SaveResetButtons } from "./Utils";
+import {
+  ResultTable,
+  SaveResetButtons,
+} from "../../common/utils/SettingsUtils";
 
 const Profile = ({ ports }: { ports: Port[] }) => {
   const [running, set_running] = useState(false);

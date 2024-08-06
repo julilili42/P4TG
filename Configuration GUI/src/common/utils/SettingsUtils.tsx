@@ -4,9 +4,9 @@ import {
   TestMode,
   TrafficGenData,
   RFCTestResults,
-} from "../../common/Interfaces";
-import translate from "../translation/Translate";
-import InfoBox from "../InfoBox";
+} from "../Interfaces";
+import translate from "../../components/translation/Translate";
+import InfoBox from "../../components/InfoBox";
 
 const SaveResetButtons = ({
   onSave,
@@ -164,19 +164,6 @@ const GenerationModeSelection = ({
   );
 };
 
-const renderCell = (
-  data: any,
-  size: string,
-  unit: string,
-  running: boolean
-) => {
-  return data?.[size] !== undefined
-    ? `${data[size].toFixed(3)} ${unit}`
-    : running
-    ? "Not finished"
-    : "Not running";
-};
-
 const ThroughputInfo = () => (
   <>
     <h4>
@@ -305,6 +292,61 @@ const ResetInfo = () => (
   </>
 );
 
+const renderCell = (
+  data: any,
+  size: string,
+  unit: string,
+  running: boolean
+) => {
+  return data?.[size] !== undefined
+    ? `${data[size].toFixed(3)} ${unit}`
+    : running
+    ? "Not finished"
+    : "Not running";
+};
+
+const renderFrameLossCell = (data: any, size: string, running: boolean) => {
+  const frameLossData = data?.[size];
+  if (!frameLossData) {
+    return running ? "Not finished" : "Not running";
+  }
+
+  const entries = Object.entries(frameLossData).map(([key, value]) => ({
+    key,
+    value: (value as number).toFixed(3),
+  }));
+
+  const midpoint = Math.ceil(entries.length / 2);
+  const firstHalf = entries.slice(0, midpoint);
+  const secondHalf = entries.slice(midpoint);
+
+  return (
+    <Table bordered size="sm" className="m-0">
+      <thead>
+        <tr>
+          <th>Bandwidth</th>
+          <th>Frame-Loss-Rate</th>
+          <th>Bandwidth</th>
+          <th>Frame-Loss-Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {firstHalf.map((entry, index) => (
+          <tr key={index}>
+            <td>{entry.key}%</td>
+            <td>{entry.value}</td>
+            {secondHalf[index] && (
+              <>
+                <td>{secondHalf[index].key}%</td>
+                <td>{secondHalf[index].value}</td>
+              </>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+};
 const ResultTable = ({
   results,
   running,
@@ -362,7 +404,11 @@ const ResultTable = ({
                   </td>
                   <td>{renderCell(results.latency, size, "µs", running)}</td>
                   <td>
-                    {renderCell(results.frame_loss_rate, size, "Gbps", running)}
+                    {renderFrameLossCell(
+                      results.frame_loss_rate,
+                      size,
+                      running
+                    )}
                   </td>
                   <td>
                     {size === "64"

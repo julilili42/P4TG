@@ -21,7 +21,7 @@ import {
   get_rtt_options,
   get_frame_options,
 } from "../../common/utils/VisualUtils";
-import BarChart from "./Charts/BarCharts";
+import BarChart from "./Charts/rfcCharts";
 
 const createRefArray = (length: number): ChartRef[] => {
   return Array.from({ length }, () => React.createRef<HTMLDivElement>());
@@ -143,7 +143,7 @@ const HiddenGraphs = ({
 
   return (
     <>
-      {testMode === TestMode.PROFILE ? (
+      {testMode === TestMode.PROFILE && traffic_gen_list[1] ? (
         <BarChart
           refs={barChartRefs}
           selectedRFC={selectedRFC}

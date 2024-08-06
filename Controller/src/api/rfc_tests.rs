@@ -17,6 +17,7 @@ use log::{error, info, warn};
 use tokio::time::{sleep, Duration};
 use std::time::Instant;
 use std::collections::BTreeMap;
+use statrs::distribution::{StudentsT, ContinuousCDF};
 
 
 // Throughput test defined in RFC 2544 section 25.1
@@ -102,7 +103,7 @@ async fn binary_search_for_rate(
         // Adjusting traffic rate for single stream
         test_payload.streams[0].traffic_rate = current_rate;
         
-        match start_traffic_gen_with_duration(Arc::clone(&state), test_payload.clone(), 0, Some(15.0), &mut abort_rx).await {
+        match start_traffic_gen_with_duration(Arc::clone(&state), test_payload.clone(), 0, Some(10.0), &mut abort_rx).await {
             Ok(_) => {
                 info!("Successfully completed traffic generation with current rate: {}", current_rate);
 
@@ -249,16 +250,15 @@ pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Jso
         let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
         let mut latencies = Vec::new();
 
-        for i in 0..10 {
-            match start_traffic_gen_with_duration(Arc::clone(&state), adjusted_payload.clone(), i, Some(20.0), &mut abort_rx).await {
+        for i in 0..10 { // Run the test 20 times as per RFC 2544 recommendation
+            match start_traffic_gen_with_duration(Arc::clone(&state), adjusted_payload.clone(), i, Some(30.0), &mut abort_rx).await {
                 Ok(_) => {
                     info!("Successfully completed traffic generation {}", i + 1);
 
                     let stats_response = statistics(State(Arc::clone(&state))).await;
                     if let Ok(stats) = parse_response::<Statistics>(stats_response).await {
-                        // only one stream
                         if let Some(rtt) = stats.rtts.values().next() {
-                            let avg_latency_us = (rtt.mean / 2.0) / 1000.0;
+                            let avg_latency_us = (rtt.mean / 2.0) / 1000.0; // Convert to microseconds
                             latencies.push(avg_latency_us);
                             info!("Test {}: Average Latency: {:.4} µs", i + 1, avg_latency_us);
                         } else {
@@ -282,12 +282,19 @@ pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Jso
             return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(Error::new(format!("Failed to save the statistics of the latency test for {} Bytes: {}", frame_size, err)))).into_response());
         }
 
-        let overall_avg_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
-        info!("Overall Average Latency for {} Bytes: {:.4} µs", frame_size, overall_avg_latency);
+        // Calculate mean and confidence interval
+        let mean_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
+        let std_dev = (latencies.iter().map(|&x| (x - mean_latency).powi(2)).sum::<f64>() / (latencies.len() as f64 - 1.0)).sqrt();
+        let t_dist = StudentsT::new(0.0, 1.0, latencies.len() as f64 - 1.0).unwrap();
+        let margin_of_error = t_dist.inverse_cdf(0.975) * std_dev / (latencies.len() as f64).sqrt();
+        let lower_bound = mean_latency - margin_of_error;
+        let upper_bound = mean_latency + margin_of_error;
 
-        latency_results.insert(frame_size, overall_avg_latency);
+        info!("Overall Average Latency for {} Bytes: {:.4} µs", frame_size, mean_latency);
+        info!("95% Confidence Interval for {} Bytes: [{:.4}, {:.4}] µs", frame_size, lower_bound, upper_bound);
 
-        // Save the results to the state
+        latency_results.insert(frame_size, mean_latency);
+
         let mut test_result = state.multi_test_state.rfc_results.lock().await;
         test_result.latency = Some(latency_results.clone());
     }
@@ -299,9 +306,9 @@ pub async fn latency_test(State(state): State<Arc<AppState>>, Json(payload): Jso
 
 
 // Frame loss rate test defined in RFC 2544 section 25.3
-pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<BTreeMap<u32, f32>>), Response> {
+pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(payload): Json<TrafficGenData>) -> Result<(StatusCode, Json<BTreeMap<u32, BTreeMap<u32, f64>>>), Response> {
     abort_current_test(Arc::clone(&state)).await;
-    info!("Starting frame loss rate test 10 times with 10 seconds each for different frame sizes");
+    info!("Starting frame loss rate test with multiple frame sizes and rates");
 
     let mut abort_rx = create_and_store_abort_sender(Arc::clone(&state)).await;
     let frame_sizes = vec![64, 128, 512, 1024, 1518];
@@ -329,16 +336,14 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(paylo
 
         save_tg(Arc::clone(&state), test_payload.clone(), format!("Frame Loss Rate - {} Bytes", frame_size)).await;
 
+        let mut frame_results = BTreeMap::new();
         let mut consecutive_zero_loss_tests = 0;
-        let mut max_rate = 0.0_f32;
 
-        for i in 0..19 {
-            // Granularity of 5% reduction in each test
-            let reduction_factor = 1.0 - 0.05 * i as f32;
-            let test_rate = max_speed * reduction_factor;
+        for i in 0..10 {
+            let reduction_factor = 100 - 10 * i as u32;
+            let test_rate = max_speed * (reduction_factor as f32 / 100.0);
 
             test_payload.streams[0].traffic_rate = test_rate;
-
 
             match start_traffic_gen_with_duration(Arc::clone(&state), test_payload.clone(), i, Some(10.0), &mut abort_rx).await {
                 Ok(_) => {
@@ -353,21 +358,27 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(paylo
 
                         let packet_loss: u64 = stats.packet_loss.values().sum();
 
-                        let packet_loss_percent = if total_packets_sent > 0 {
+                        let mut packet_loss_percent = if total_packets_sent > 0 {
                             round_to_three_places((packet_loss as f64 / total_packets_sent as f64) * 100.0)
                         } else {
                             0.0
                         };
 
+                        // Begrenze die Frame Loss Rate auf 100%
+                        if packet_loss_percent > 100.0 {
+                            packet_loss_percent = 100.0;
+                        }
+
                         info!("Total packets sent: {}", total_packets_sent);
                         info!("Packet loss: {} packets", packet_loss);
                         info!("Packet loss percentage: {:.2}%", packet_loss_percent);
 
+                        frame_results.insert(reduction_factor, packet_loss_percent);
+
                         if packet_loss_percent == 0.0 {
                             consecutive_zero_loss_tests += 1;
                             if consecutive_zero_loss_tests == 2 {
-                                max_rate = test_payload.streams[0].traffic_rate / 0.9; // zurück zu der vorherigen Rate
-                                info!("Two consecutive tests with 0% frame loss detected for frame size {}. Maximum rate: {:.2} Gbps", frame_size, max_rate);
+                                info!("Two consecutive tests with 0% frame loss detected for frame size {}. Aborting further tests for this size.", frame_size);
                                 break;
                             }
                         } else {
@@ -384,7 +395,7 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(paylo
             }
         }
 
-        results.insert(frame_size, max_rate);
+        results.insert(frame_size, frame_results);
 
         // Update frame_loss_rate_map and save results after each frame size test
         let mut test_result = state.multi_test_state.rfc_results.lock().await;
@@ -399,6 +410,7 @@ pub async fn frame_loss_rate_test(State(state): State<Arc<AppState>>, Json(paylo
 
     Ok((StatusCode::OK, Json(results)))
 }
+
 
 
 

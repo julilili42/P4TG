@@ -21,7 +21,7 @@ import {
   TestModeSelection,
   TotalDuration,
   ImportExport,
-} from "./Utils";
+} from "../../common/utils/SettingsUtils";
 import StreamTable from "./StreamTable";
 import PortMappingTable from "./PortMappingTable";
 import {

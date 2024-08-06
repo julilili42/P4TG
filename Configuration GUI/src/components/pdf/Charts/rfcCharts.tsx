@@ -1,5 +1,5 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from "react";
-import { Bar } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import { Chart, registerables } from "chart.js";
 import { get } from "../../../common/API";
 import { Statistics, ChartRef } from "../../../common/Interfaces";
@@ -11,8 +11,10 @@ interface ChartData {
   datasets: {
     label: string;
     data: number[];
-    backgroundColor: string;
-    barThickness: number;
+    backgroundColor?: string;
+    borderColor?: string;
+    barThickness?: number;
+    fill?: boolean;
     yAxisID?: string;
   }[];
 }
@@ -21,7 +23,7 @@ interface ProfileData {
   throughput: { [key: string]: number };
   latency: { [key: string]: number };
   packet_loss: { [key: string]: number };
-  frame_loss_rate: { [key: string]: number };
+  frame_loss_rate: { [key: string]: { [key: string]: number } };
   reset: { [key: string]: number };
 }
 
@@ -64,7 +66,8 @@ const fetchChartData = async (
 const generateChartData = (
   data: { [key: string]: number } | undefined,
   label: string,
-  backgroundColor: string
+  backgroundColor: string,
+  isLineChart: boolean = false
 ): ChartData | null => {
   if (!data || Object.keys(data).length === 0) {
     return null;
@@ -76,8 +79,10 @@ const generateChartData = (
       {
         label: label,
         data: Object.values(data).map((value) => Number(value.toFixed(3))),
-        backgroundColor: backgroundColor,
-        barThickness: 50,
+        backgroundColor: isLineChart ? undefined : backgroundColor,
+        borderColor: isLineChart ? backgroundColor : undefined,
+        barThickness: isLineChart ? undefined : 50,
+        fill: isLineChart ? false : undefined,
       },
     ],
   };
@@ -85,31 +90,40 @@ const generateChartData = (
 
 const createChartOptions = (
   yAxisTitle: string,
-  yAxisTickCallback?: (value: any) => string
-) => ({
-  ...commonChartOptions,
-  scales: {
-    ...commonChartOptions.scales,
-    y: {
-      type: "linear" as const,
-      title: {
-        display: true,
-        text: yAxisTitle,
-        color: "black",
-        font: {
-          size: 20,
+  tooltipCallback?: (value: any) => string,
+  xAxisTitle?: string
+) => {
+  return {
+    ...commonChartOptions,
+    scales: {
+      ...commonChartOptions.scales,
+      x: {
+        ...commonChartOptions.scales.x,
+        title: {
+          ...commonChartOptions.scales.x.title,
+          text: xAxisTitle || commonChartOptions.scales.x.title.text,
         },
       },
-      ticks: {
-        color: "black",
-        font: {
-          size: 18,
+      y: {
+        ...commonChartOptions.scales.y,
+        title: {
+          ...commonChartOptions.scales.y.title,
+          text: yAxisTitle,
         },
-        callback: yAxisTickCallback,
       },
     },
-  },
-});
+    plugins: {
+      ...commonChartOptions.plugins,
+      tooltip: {
+        callbacks: {
+          label: tooltipCallback
+            ? tooltipCallback
+            : (context: any) => context.raw,
+        },
+      },
+    },
+  };
+};
 
 const checkRenderComplete = (
   refs: React.MutableRefObject<any>[],
@@ -206,11 +220,26 @@ const generateLatencyData = (data: ProfileData): ChartData | null => {
 };
 
 const generateFrameLossRateData = (data: ProfileData): ChartData | null => {
-  return generateChartData(
-    data.frame_loss_rate,
-    "Frame Loss Rate",
-    "rgba(255, 165, 0, 0.6)"
-  );
+  if (!data.frame_loss_rate) {
+    return null;
+  }
+
+  const labels = Object.keys(data.frame_loss_rate["64"]);
+  const datasets = Object.keys(data.frame_loss_rate).map((frameSize) => {
+    return {
+      label: `${frameSize} Bytes`,
+      data: Object.values(data.frame_loss_rate[frameSize]).map((value) =>
+        Number(value.toFixed(3))
+      ),
+      borderColor: getColorForFrameSize(frameSize),
+      fill: false,
+    };
+  });
+
+  return {
+    labels,
+    datasets,
+  };
 };
 
 const generateResetData = (data: ProfileData): ChartData | null => {
@@ -329,7 +358,11 @@ const packetLossChartOptions = createChartOptions(
 
 const latencyChartOptions = createChartOptions("Latency (μs)");
 
-const frameLossRateChartOptions = createChartOptions("Frame Loss Rate (Gbps)");
+const frameLossRateChartOptions = createChartOptions(
+  "Frame Loss Rate (%)",
+  undefined,
+  "Bandwidth (%)"
+);
 
 const resetChartOptions = createChartOptions("Seconds");
 
@@ -362,7 +395,7 @@ const LatencyChart = forwardRef<any, { data: ChartData | null }>(
 const FrameLossRateChart = forwardRef<any, { data: ChartData | null }>(
   ({ data }, ref) => {
     return data ? (
-      <Bar data={data} options={frameLossRateChartOptions} ref={ref} />
+      <Line data={data} options={frameLossRateChartOptions} ref={ref} />
     ) : null;
   }
 );
@@ -454,3 +487,16 @@ const BarChart = forwardRef(
 );
 
 export default BarChart;
+
+// Helper function to get color for different frame sizes
+const getColorForFrameSize = (frameSize: string): string => {
+  const colors: { [key: string]: string } = {
+    "64": "rgba(255, 99, 132, 0.6)",
+    "128": "rgba(54, 162, 235, 0.6)",
+    "512": "rgba(75, 192, 192, 0.6)",
+    "1024": "rgba(153, 102, 255, 0.6)",
+    "1518": "rgba(255, 159, 64, 0.6)",
+  };
+
+  return colors[frameSize] || "rgba(0, 0, 0, 0.6)";
+};

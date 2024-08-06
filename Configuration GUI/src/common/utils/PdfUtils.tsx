@@ -201,6 +201,7 @@ export const createPdf = (
 
   return doc.output("arraybuffer");
 };
+
 export const createRfcTable = (
   doc: jsPDF,
   test: any,
@@ -214,6 +215,12 @@ export const createRfcTable = (
       ? ["Frame Size", "64 Bytes"]
       : ["Frame Size", ...frameSizes.map((size) => `${size} Bytes`)];
 
+  const calculateAverage = (data: { [key: string]: number }): number => {
+    const values = Object.values(data);
+    const sum = values.reduce((acc, curr) => acc + curr, 0);
+    return sum / values.length;
+  };
+
   const createRow = (testType: string, data: any, unit: string) => {
     if (graphType === "reset") {
       return [
@@ -221,6 +228,18 @@ export const createRfcTable = (
         data && data["64"] !== undefined
           ? `${Number(data["64"]).toFixed(3)}${unit}`
           : "Not running",
+      ];
+    }
+    if (graphType === "frame_loss_rate") {
+      return [
+        testType,
+        ...frameSizes.map((size) => {
+          if (data && data[size] !== undefined) {
+            const averageLoss = calculateAverage(data[size]);
+            return `${averageLoss.toFixed(3)}${unit}`;
+          }
+          return "Not running";
+        }),
       ];
     }
     return [
@@ -235,11 +254,11 @@ export const createRfcTable = (
 
   const testMappings = {
     throughput: { label: "Throughput", data: test.throughput, unit: " Gbps" },
-    latency: { label: "Latency", data: test.latency, unit: " ms" },
+    latency: { label: "Latency", data: test.latency, unit: " mus" },
     frame_loss_rate: {
-      label: "Frame Loss Rate",
+      label: "Mean Frame Loss Rate",
       data: test.frame_loss_rate,
-      unit: " Gbps",
+      unit: " %",
     },
     reset: { label: "Reset", data: test.reset, unit: " Seconds" },
   };
@@ -344,8 +363,6 @@ const addGraphsAndTables = (
 
   let yOffset = 35;
 
-  console.log(graph_images);
-
   if (graph_images[graphType]) {
     graph_images[graphType].forEach((imageData) => {
       doc.addImage(imageData, "JPEG", 15, yOffset, 180, 90, "", "FAST");
@@ -356,7 +373,7 @@ const addGraphsAndTables = (
   // If graphType is "throughput", add the packet_loss image below the throughput image
   if (graphType === "throughput" && graph_images["packet_loss"]) {
     graph_images["packet_loss"].forEach((imageData) => {
-      doc.addImage(imageData, "JPEG", 15, yOffset, 180, 90, "", "FAST");
+      doc.addImage(imageData, "JPEG", 11, yOffset, 180, 90, "", "FAST");
       yOffset += 100;
     });
   }
@@ -908,6 +925,7 @@ export const createProfileToC = (
   ];
 
   const addSectionEntries = (section: any) => {
+    console.log(section);
     tocEntries.push({
       title: section.name,
       page: `Page ${currentPage}`,
@@ -936,7 +954,7 @@ export const createProfileToC = (
   if (selectedRFC === 0) {
     sections.forEach(addSectionEntries);
   } else {
-    const section = sections[selectedRFC - 1];
+    const section = sections[0];
     addSectionEntries(section);
   }
 
