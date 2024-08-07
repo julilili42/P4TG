@@ -14,7 +14,7 @@ const translate = (
   )
 ): string => {
   const langCode = userLangToTranslateCode(language);
-  if (langCode === "EN") return key; // Return the key itself for English
+  if (langCode === "EN") return key;
   return languages[langCode]?.[key] || key;
 };
 

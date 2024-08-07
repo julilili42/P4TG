@@ -108,7 +108,11 @@ const Navbar = () => {
         <NavLink to={"/"} text={""} icon={"bi bi-speedometer"} />
         <NavLink to={"/ports"} text={""} icon={"bi bi-ethernet"} />
         <NavLink to={"/tables"} text={""} icon={"bi bi-table"} />
-        <NavLink to={"/tests"} text={""} icon={"bi bi-gear-wide-connected"} />
+        <NavLink
+          to={"/settings"}
+          text={""}
+          icon={"bi bi-gear-wide-connected"}
+        />
         <Row className="flex-grow-1"></Row>
         <Selector />
         <ThemeBtn />

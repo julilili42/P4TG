@@ -51,7 +51,7 @@ export const GitHub = () => {
     <Row className="mt-2">
       <Col className="text-center col-12 mt-3">
         <StyledLink href="https://github.com/uni-tue-kn/P4TG" target="_blank">
-          P4TG @ <i className="bi bi-github" style={{ color: "white" }}></i>
+          P4TG @ <i className="bi bi-github"></i>
         </StyledLink>
       </Col>
     </Row>

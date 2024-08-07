@@ -1,5 +1,5 @@
 import { Row, Col, Table } from "react-bootstrap";
-import StreamElement from "../settings/StreamElement";
+import StreamElement from "./StreamElement";
 import { GenerationMode, TrafficGenData } from "../../common/Interfaces";
 
 const StreamTable = ({

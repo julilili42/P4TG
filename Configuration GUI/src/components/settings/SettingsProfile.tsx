@@ -27,6 +27,7 @@ import InfoBox from "../InfoBox";
 import {
   ResultTable,
   SaveResetButtons,
+  RFC2544Info,
 } from "../../common/utils/SettingsUtils";
 
 const Profile = ({ ports }: { ports: Port[] }) => {
@@ -199,38 +200,7 @@ const Profile = ({ ports }: { ports: Port[] }) => {
             </Dropdown.Item>
           </DropdownButton>
           <InfoBox>
-            <>
-              <h4>RFC 2544</h4>
-              <p>
-                RFC 2544 definiert Methoden zur Leistungsbewertung von
-                Netzwerkgeräten. Die wichtigsten Tests sind:
-              </p>
-              <ul>
-                <li>
-                  <strong>Durchsatz:</strong> Maximale Datenrate ohne
-                  Paketverlust.
-                </li>
-                <li>
-                  <strong>Latenz:</strong> Zeit für ein Paket, durch das Gerät
-                  zu gelangen.
-                </li>
-                <li>
-                  <strong>Paketverlust:</strong> Anzahl verlorener Pakete bei
-                  verschiedenen Datenraten.
-                </li>
-                <li>
-                  <strong>Jitter:</strong> Variabilität der Paketlatenz.
-                </li>
-                <li>
-                  <strong>Back-to-Back Frames:</strong> Verarbeitung
-                  aufeinanderfolgender Pakete.
-                </li>
-                <li>
-                  <strong>System-Recovery:</strong> Erholungszeit nach
-                  Überlastung.
-                </li>
-              </ul>
-            </>
+            <RFC2544Info />
           </InfoBox>
         </Col>
         <Col className="col-2">

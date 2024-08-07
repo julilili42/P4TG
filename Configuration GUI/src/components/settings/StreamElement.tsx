@@ -28,8 +28,8 @@ import {
 import React, { useEffect, useState } from "react";
 import { Button, Form, InputGroup } from "react-bootstrap";
 import InfoBox from "../InfoBox";
-import { StyledCol, StyledRow } from "../../sites/Settings";
 import translate from "../translation/Translate";
+import { StyledCol, StyledRow } from "../../sites/Settings";
 
 const StreamElement = ({
   running,

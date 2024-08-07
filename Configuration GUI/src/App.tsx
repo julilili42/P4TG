@@ -29,14 +29,13 @@ import Navbar from "./components/Navbar";
 import Home, { GitHub } from "./sites/Home";
 import Setup from "./sites/Setup";
 import Ports from "./sites/Ports";
-import Settings from "./sites/Settings";
 import Offline from "./sites/Offline";
 import Tables from "./sites/Tables";
 import config from "./config";
 import { StreamSettings } from "./common/Interfaces";
 import { Stream } from "./common/Interfaces";
 import { validateStreams, validateStreamSettings } from "./common/Validators";
-import ListSettings from "./components/ListSettings/ListSettings";
+import Settings from "./sites/Settings";
 
 const App = () => {
   const [error, set_error] = useState(false);
@@ -133,7 +132,6 @@ const App = () => {
                       <Route path={"/home"} element={<Home />} />
                       <Route path={"/ports"} element={<Ports />} />
                       <Route path={"/tables"} element={<Tables />} />
-                      <Route path={"/tests"} element={<ListSettings />} />
                       <Route path={"/settings"} element={<Settings />} />
                     </Routes>
                   ) : (

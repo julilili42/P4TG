@@ -1,6 +1,5 @@
 import React from "react";
 import { Tabs, Tab } from "react-bootstrap";
-
 import {
   TrafficGenList,
   TrafficGenData,
@@ -23,6 +22,7 @@ import { getPortAndChannelFromPid } from "./PdfUtils";
 
 import StatView from "../../components/StatView";
 import StreamView from "../../components/StreamView";
+import { get } from "../API";
 import translate from "../../components/translation/Translate";
 
 interface RenderTabsProps {

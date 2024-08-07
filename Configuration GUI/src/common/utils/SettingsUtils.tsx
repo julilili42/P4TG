@@ -164,39 +164,71 @@ const GenerationModeSelection = ({
   );
 };
 
+export const RFC2544Info = () => (
+  <>
+    <h4>RFC 2544</h4>
+    <p>
+      RFC 2544 definiert Methoden zur Leistungsbewertung von Netzwerkgeräten.
+      Die wichtigsten Tests sind:
+    </p>
+    <ul>
+      <li>
+        <strong>Durchsatz:</strong> Maximale Datenrate ohne Paketverlust (auch
+        zero loss throughput genannt).
+      </li>
+      <li>
+        <strong>Latenz:</strong> Zeit, die ein Paket benötigt, um durch das
+        Gerät zu gelangen (hier Annäherung durch One-way Latenz).
+      </li>
+      <li>
+        <strong>Frame-Loss:</strong> Prozentsatz der Frames, die das Gerät bei
+        verschiedenen Lasten nicht weiterleiten kann.
+      </li>
+      <li>
+        <strong>Reset:</strong> Erholungszeit nach Überlastung. Zeit zum
+        Abarbeiten der aufgebauten Frame-Warteschlange.
+      </li>
+    </ul>
+  </>
+);
+
 const ThroughputInfo = () => (
   <>
     <h4>
       Throughput-Test{" "}
       <a href="https://www.ietf.org/rfc/rfc2544.txt">(Section 26.1)</a>
     </h4>
-    Starte einen Datenstrom mit definierten Stream Sende-Rate durch das DUT
-    (Device Under Test). Die Stream-Rate wie auch die Frame-Größe kann in dem
-    Stream-Table eingestellt werden. Es wird die Anzahl der gesendeten und
-    empfangenen Frames aufgenommen und über <br />
+    Ziel dieses Tests ist die Ermittlung der unbekannten Durchsatzraten eines
+    DUT (Device Under Test). Dabei werden die Durchsatzraten für die
+    Frame-Größen 64, 128, 512, 1024 und 1518 Bytes ermittelt. Die anfängliche
+    Stream-Rate entspricht der in der Stream-Tabelle definierten Rate. Der Test
+    erfolgt in zwei Schritten: Zunächst wird mittels exponentieller Suche das
+    Intervall ermittelt, in dem sich die Senderate befindet. Anschließend wird
+    innerhalb dieses Intervalls eine binäre Suche durchgeführt. In jeder
+    Iteration wird die Frame Loss Rate berechnet, um die Anpassung der
+    Intervallgrenzen zu bestimmen:
+    <br />
     <code>
       Frame Loss Rate = round(((input_count - output_count) * 100) /
       input_count, 2)
     </code>
     <br />
-    die Frame Loss Rate berechnet. Zunächst wird über exponentieller Suche,
-    beginnend mit der angegebenen Senderate, nach dem Interval gesucht auf dem
-    im Anschluss eine Binäre Suche ausgeführt wird.
-    <br />
-    Falls die Frame Loss Rate 0 ist, wird die untere Grenze des Intervalls
-    erhöht, andernfalls wird die obere Grenze des Intervalls verringert.
-    <br />
-    Die Exponentielle und die Binäre Suche werden beide höchstens in 10
-    Iterrationen ausgeführt. Dabei liegt die Dauer eines Tests bei 10 Sekunden.
+    Bei keinem oder weniger als 0,01% Paketverlust wird die untere
+    Intervallgrenze erhöht, andernfalls die obere Grenze verringert. Die
+    exponentielle Suche ist auf zehn Iterationen begrenzt. Jede Iteration dauert
+    zehn Sekunden.
     <br />
     <br />
     <strong>Vorgehensweise:</strong>
     <ol>
+      Für jede Frame-Größe:
       <li>
-        Beginn mit angegebener Stream Sende-Rate Exponentielle Suche und finde
-        Senderaten-Intervall{" "}
+        Starte mit der angegebenen Stream-Sende-Rate die exponentielle Suche und
+        finde das Senderaten-Intervall.
       </li>
-      <li>Starte Binäre Suche auf Senderaten-Intervall </li>
+      <li>
+        Führe eine binäre Suche innerhalb des ermittelten Intervalls durch.
+      </li>
     </ol>
   </>
 );

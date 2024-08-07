@@ -1,6 +1,6 @@
 import { Row, Col, Table, Form } from "react-bootstrap";
 import { GenerationMode, TrafficGenData, Port } from "../../common/Interfaces";
-import StreamSettingsList from "../settings/StreamSettingsList";
+import StreamSettingsList from "./StreamSettingsList";
 import { StyledCol } from "../../sites/Settings";
 
 const PortMappingTable = ({

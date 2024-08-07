@@ -269,15 +269,6 @@ export interface P4TGConfig {
   }[];
 }
 
-export interface TrafficGenData {
-  mode: GenerationMode;
-  streams: Stream[];
-  stream_settings: StreamSettings[];
-  port_tx_rx_mapping: { [name: number]: number };
-  duration?: number;
-  name?: string;
-}
-
 export const DefaultTrafficGenData = (ports: Port[]) => {
   const initialStreamSettings = ports
     .filter((v) => v.loopback === "BF_LPBK_NONE")
@@ -295,12 +286,17 @@ export const DefaultTrafficGenData = (ports: Port[]) => {
   };
 };
 
-export interface TrafficGenList {
-  [testId: number]: TrafficGenData;
+export interface TrafficGenData {
+  mode: GenerationMode;
+  streams: Stream[];
+  stream_settings: StreamSettings[];
+  port_tx_rx_mapping: { [name: number]: number };
+  duration?: number;
+  name?: string;
 }
 
-export interface PreviousStatistics {
-  [testId: number]: Statistics;
+export interface TrafficGenList {
+  [testId: number]: TrafficGenData;
 }
 
 export interface RFCTestResults {
