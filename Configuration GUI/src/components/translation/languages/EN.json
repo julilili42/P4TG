@@ -1,6 +1,10 @@
 {
   "buttons": {
     "reset": "Reset",
+    "runTest": "Run Tests",
+    "runProfile": "Run Profile",
+    "stopProfile": "Stop Profile",
+    "skipTest": "Skip Test",
     "save": "Save",
     "import": "Import",
     "export": "Export",

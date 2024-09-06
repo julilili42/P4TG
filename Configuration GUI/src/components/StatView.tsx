@@ -17,7 +17,7 @@
  * Steffen Lindner (steffen.lindner@uni-tuebingen.de)
  */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Col, Row, Table } from "react-bootstrap";
 import {
   GenerationMode,

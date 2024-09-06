@@ -80,7 +80,7 @@ const DownloadPdf = ({
   useEffect(() => {
     const interval = setInterval(() => {
       const storedLanguage = localStorage.getItem("language") || "en-US";
-      if (storedLanguage != currentLanguage) {
+      if (storedLanguage !== currentLanguage) {
         setCurrentLanguage(storedLanguage);
       }
     }, 200);

@@ -33,7 +33,7 @@ export const createAutoTableConfig = (
       const shouldDraw =
         !applyRttRowColSkip ||
         (applyRttRowColSkip &&
-          ((data.column.index != 3 && data.column.index != 4) ||
+          ((data.column.index !== 3 && data.column.index !== 4) ||
             data.row.index <= 3));
 
       if (shouldDraw && shouldDrawLine(data.column.index, indicesToDraw)) {
@@ -88,7 +88,7 @@ export const formatActiveStreamRows = (
     stream.app_id,
     stream.frame_size + " bytes",
     stream.traffic_rate + " Gbps",
-    stream.burst == 1 ? "IAT Precision" : "Rate Precision",
+    stream.burst === 1 ? "IAT Precision" : "Rate Precision",
     stream.vxlan,
     encapsulation[stream.encapsulation],
     stream.number_of_lse,

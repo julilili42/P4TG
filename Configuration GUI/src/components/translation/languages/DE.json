@@ -1,6 +1,10 @@
 {
   "buttons": {
     "reset": "Zurücksetzen",
+    "runTest": "Tests starten",
+    "runProfile": "Profil starten",
+    "stopProfile": "Profil stoppen",
+    "skipTest": "Test überspringen",
     "save": "Sichern",
     "import": "Importieren",
     "export": "Exportieren",

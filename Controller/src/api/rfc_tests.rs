@@ -23,7 +23,7 @@ use rbfrt::table;
 use rbfrt::table::{MatchValue, ToBytes};
 use std::collections::HashMap;
 
-
+// MAgic Numbers beseitigen, frame_sizes, burst, ....
 
 
 // Throughput test defined in RFC 2544 section 25.1
@@ -184,8 +184,9 @@ async fn exponential_search_for_max_rate(
         let test_rate = initial_tx_rate * 2f32.powi(k);
 
         if test_rate > 100.0 {
-            info!("Test rate exceeds 100 Gbps, stopping search");
-            break;
+            let lower_bound = initial_tx_rate * 2f32.powi(k - 1);
+            info!("Test rate exceeds 100 Gbps, returning interval [{}, 100]", lower_bound);
+            return Ok((lower_bound, 100.0));
         }
 
         info!("Exponential search iteration {}: testing rate {}", k, test_rate);
@@ -627,11 +628,25 @@ async fn monitor_packet_loss(
 
 // Waits for the first packet to be received
 async fn wait_for_first_packet(state: &Arc<AppState>, interval: Duration) -> u64 {
+    // Loop until `running` is true
     loop {
-        // Check total received packets
+        let running = state.experiment.lock().await.running;
+
+        // If `running` is true, break out of the loop
+        if running {
+            break;
+        }
+
+        info!("Experiment not running yet, waiting...");
+        tokio::time::sleep(interval).await; // Wait for the interval before checking again
+    }
+
+    // Loop to check for received packets
+    loop {
+        // Check the total number of received packets
         let total_packets_received = get_total_received_packets(state).await;
 
-        // If packets have been received, return the count
+        // If any packets have been received, return the count
         if total_packets_received > 0 {
             info!("First packet received: {}", total_packets_received);
             return total_packets_received;
