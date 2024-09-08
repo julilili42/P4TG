@@ -1,9 +1,7 @@
 import React from "react";
-import { Button, Col, OverlayTrigger, Tooltip } from "react-bootstrap";
+import { Alert, Button, Col, OverlayTrigger, Tooltip } from "react-bootstrap";
 import translate from "../../../components/translation/Translate";
 import { ProfileMode, TestMode } from "../../Interfaces";
-import { Time } from "../../../components/SendReceiveMonitor";
-import { secondsToTime } from "../StatisticUtils";
 
 type TestInfoProps = {
   running: boolean;
@@ -157,4 +155,39 @@ const ActionButtonsNotRunning = ({
   );
 };
 
-export { TestInfoTooltip, ActionButtonsRunning, ActionButtonsNotRunning };
+const ResetAlert = ({
+  running,
+  testMode,
+  selectedProfile,
+  currentProfileTest,
+  currentLanguage,
+}: {
+  running: boolean;
+  testMode: TestMode;
+  selectedProfile: ProfileMode;
+  currentProfileTest: string | null;
+  currentLanguage: string;
+}) => {
+  if (
+    running &&
+    testMode === TestMode.PROFILE &&
+    selectedProfile === ProfileMode.RFC2544 &&
+    currentProfileTest === "Reset - 64 Bytes"
+  ) {
+    return (
+      <Col className="col-12">
+        <Alert variant={"primary"}>
+          {translate("alert.dutReset", currentLanguage)}
+        </Alert>
+      </Col>
+    );
+  }
+  return null;
+};
+
+export {
+  TestInfoTooltip,
+  ActionButtonsRunning,
+  ActionButtonsNotRunning,
+  ResetAlert,
+};

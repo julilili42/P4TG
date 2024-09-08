@@ -289,7 +289,8 @@
     "saved": "Einstellungen wurden gesichert.",
     "reset": "Einstellungen wurden zurückgesetzt.",
     "streamLimit": "Nur 7 Streams können gleichzeitig aktiv sein.",
-    "selected": "Kein Test ausgewählt."
+    "selected": "Kein Test ausgewählt.",
+    "dutReset": "Löse einen DUT-Reset in den nächsten 120 Sekunden aus"
   },
   "other": {
     "mode": "Modus",
@@ -300,6 +301,7 @@
     "arpReply": "ARP Antwort",
     "of": "von",
     "testInfo": "Test Info",
-    "duration": "Dauer"
+    "duration": "Dauer",
+    "testDuration": "Anzahl der Sekunden"
   }
 }

@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Button, Col, Form, Row, Alert } from "react-bootstrap";
+import { Col, Form, Row } from "react-bootstrap";
 import { del, post } from "../common/API";
 import SendReceiveMonitor from "../components/SendReceiveMonitor";
 import Loader from "../components/Loader";
@@ -44,11 +44,12 @@ import translate from "../components/translation/Translate";
 import HiddenGraphs from "../components/pdf/HiddenVisuals";
 import Download from "../components/Download";
 
-import RenderTabs from "../common/utils/Home/Tabs";
+import RenderTabs from "../common/utils/Home/Tabs/Tabs";
 import {
   TestInfoTooltip,
   ActionButtonsRunning,
   ActionButtonsNotRunning,
+  ResetAlert,
 } from "../common/utils/Home/Components";
 
 import {
@@ -351,7 +352,6 @@ const Home = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
         return allTestsValid && profileData.running === false;
       } else {
         const profileKey = profileKeys[selectedRFC - 1];
-        console.log(profileKey);
         return (
           profileData[profileKey] !== null && profileData.running === false
         );
@@ -395,20 +395,15 @@ const Home = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
     <Loader loaded={loaded} overlay={overlay}>
       <form onSubmit={onSubmit}>
         <Row className={"mb-3"}>
-          {running &&
-            test_mode === TestMode.PROFILE &&
-            selectedProfile === ProfileMode.RFC2544 &&
-            currentProfileTest === "Reset - 64 Bytes" && (
-              <Col className="col-12">
-                <Alert variant={"primary"}>
-                  Cause a Reset in the DUT in the next 120 Seconds
-                </Alert>
-              </Col>
-            )}
+          <ResetAlert
+            running={running}
+            testMode={test_mode}
+            selectedProfile={selectedProfile}
+            currentProfileTest={currentProfileTest}
+            currentLanguage={currentLanguage}
+          />
           <SendReceiveMonitor stats={statistics} running={running} />
           <Col className={"text-end col-4"}>
-            <>{console.log(currentTestNumber)}</>
-            <>{console.log(totalTestsNumber)}</>
             {running ||
             (test_mode === TestMode.MULTI &&
               currentTestNumber !== totalTestsNumber) ? (
@@ -493,6 +488,7 @@ const Home = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
       <RenderTabs
         test_mode={test_mode}
         selectedRFC={selectedRFC}
+        selectedProfile={selectedProfile}
         statistics={statistics}
         time_statistics={time_statistics}
         traffic_gen_list={traffic_gen_list}

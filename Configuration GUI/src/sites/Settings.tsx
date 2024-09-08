@@ -11,12 +11,13 @@ import {
   TrafficGenList,
   DefaultTrafficGenData,
   TabInterface,
+  Port,
 } from "../common/Interfaces";
 import Loader from "../components/Loader";
 import { GitHub } from "./Home";
 import translate from "../components/translation/Translate";
 
-import { loadPorts, reset } from "../common/utils/Home/Api";
+import { loadPorts } from "../common/utils/Home/Api";
 
 import {
   SaveResetButtons,
@@ -59,19 +60,10 @@ export const StyledCol = styled.td`
 `;
 
 const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
-  const [ports, set_ports] = useState<
-    {
-      pid: number;
-      port: number;
-      channel: number;
-      loopback: string;
-      status: boolean;
-    }[]
-  >([]);
+  const [ports, set_ports] = useState<Port[]>([]);
   const [traffic_gen_list, set_traffic_gen_list] = useState<TrafficGenList>(
     JSON.parse(localStorage.getItem("traffic_gen") ?? "{}")
   );
-  const [currentTest, setCurrentTest] = useState<TrafficGenData | null>(null);
 
   const [currentTestMode, setCurrentTestMode] = useState(
     JSON.parse(
@@ -79,9 +71,15 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
     ).mode
   );
 
+  const [currentTabIndex, setCurrentTabIndex] = useState<string | null>(
+    Object.keys(traffic_gen_list)[0] ?? null
+  );
+  const [currentTest, setCurrentTest] = useState<TrafficGenData | null>(
+    traffic_gen_list[Object.keys(traffic_gen_list)[0] as any] ?? null
+  );
+  const [key, setKey] = useState<string>("tab-1");
+
   const [tabs, setTabs] = useState<TabInterface[]>([]);
-  const [key, setKey] = useState<string>("");
-  const [currentTabIndex, setCurrentTabIndex] = useState<string | null>(null);
   const [running, set_running] = useState(false);
 
   const [totalDuration, setTotalDuration] = useState<number>(0);
@@ -106,6 +104,7 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
       }
       localStorage.removeItem("traffic_gen");
       set_traffic_gen_list({});
+      console.log("test");
       setTabs([]);
       setTotalDuration(0);
     }
@@ -157,6 +156,12 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
     }
   };
 
+  useEffect(() => {
+    if (Object.keys(traffic_gen_list).length > 0) {
+      initializeTabs();
+    }
+  }, [Object.keys(traffic_gen_list).length]);
+
   const initializeTabs = () => {
     if (currentTestMode === TestMode.MULTI) {
       const initializedTabs: TabInterface[] = Object.keys(traffic_gen_list).map(
@@ -175,14 +180,6 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
         titleEditable: false,
       });
       setTabs(initializedTabs);
-
-      if (initializedTabs.length > 0) {
-        setKey(initializedTabs[0].eventKey);
-        setCurrentTabIndex(Object.keys(traffic_gen_list)[0]);
-        setCurrentTest(
-          traffic_gen_list[Object.keys(traffic_gen_list)[0] as any]
-        );
-      }
     } else {
       const initializedTabs: TabInterface[] = [
         {
@@ -245,7 +242,6 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
     const updatedTrafficGenList = { ...traffic_gen_list };
     delete updatedTrafficGenList[key as any];
 
-    // Update keys to ensure no gaps
     const newTrafficGenList: any = {};
     let newIndex = 1;
     Object.keys(updatedTrafficGenList).forEach((k) => {
@@ -307,12 +303,10 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
         const defaultData = DefaultTrafficGenData(stats.data);
         set_traffic_gen_list({ 1: defaultData });
         localStorage.setItem("traffic_gen", JSON.stringify({ 1: defaultData }));
-        window.location.reload();
       }
       if (!localStorage.getItem("test")) {
         localStorage.setItem("test", JSON.stringify({ mode: TestMode.SINGLE }));
         setCurrentTestMode(TestMode.SINGLE);
-        window.location.reload();
       }
     }
   };
@@ -785,7 +779,7 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
                       </span>
                     )}
 
-                    {tab.eventKey !== "tab-1" ? (
+                    {tab.eventKey !== "tab-1" && (
                       <button
                         className="outline-none border-0 bg-transparent"
                         onClick={(e) => {
@@ -795,8 +789,6 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
                       >
                         <i className="bi bi-x"></i>
                       </button>
-                    ) : (
-                      <></>
                     )}
                   </div>
                 ) : (
@@ -838,7 +830,7 @@ const Settings = ({ p4tg_infos }: { p4tg_infos: P4TGInfos }) => {
                           type="number"
                           min={0}
                           placeholder={translate(
-                            "Number of seconds",
+                            "other.testDuration",
                             currentLanguage
                           )}
                           value={currentTest?.duration}

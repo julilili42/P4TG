@@ -288,7 +288,8 @@
     "saved": "Settings saved.",
     "reset": "Settings reset.",
     "streamLimit": "Only 7 different streams allowed.",
-    "selected": "No test selected."
+    "selected": "No test selected.",
+    "dutReset": "Cause a Reset in the DUT in the next 120 Seconds"
   },
   "other": {
     "mode": "Mode",
@@ -299,6 +300,7 @@
     "arpReply": "ARP Reply",
     "of": "of",
     "testInfo": "Test Info",
-    "duration": "Duration"
+    "duration": "Duration",
+    "testDuration": "Number of seconds"
   }
 }
